@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Orbits P2P</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <!-- Login Panel -->
+    <div id="login-panel" class="glass-panel">
+      <h2>Orbits P2P</h2>
+      <p>Добро пожаловать в децентрализованную сеть. Создай уникальный позывной.</p>
+      <input type="text" id="nickname-input" placeholder="твой_никнейм">
+      <button id="login-btn" class="primary-btn">Войти в сеть</button>
+    </div>
+
+    <!-- App Container -->
+    <div id="app-container" style="display: none;">
+      <!-- Sidebar / Friend List -->
+      <div id="sidebar">
+        <div class="sidebar-header">ORBITS</div>
+        <div class="add-friend-box">
+          <input type="text" id="add-friend-input" placeholder="Ник друга...">
+          <button id="add-friend-btn">+</button>
+        </div>
+        <div id="friends-list">
+          <!-- Friends will be generated here by JS -->
+        </div>
+        <div id="my-profile">
+          <div class="friend-avatar">
+            <span id="my-avatar-letter">Me</span>
+          </div>
+          <div class="my-info">
+            <span id="my-id-display">Загрузка...</span>
+            <span class="status-online" id="my-status">В сети</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Chat Area -->
+      <div id="chat-area">
+        <div id="empty-state">
+          <span style="font-size: 64px;">🌌</span>
+          <p>Выберите друга, чтобы начать общение</p>
+        </div>
+
+        <div id="active-chat" style="display: none;">
+          <div class="chat-header">
+            <div class="chat-header-info">
+              <button id="back-btn" class="action-btn back-btn" title="Назад" style="margin-right: 10px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div class="friend-avatar" id="current-chat-avatar">F</div>
+              <div class="chat-header-text">
+                <span id="chat-friend-name">Ник друга</span>
+                <span id="chat-friend-status" class="chat-status-text">в сети</span>
+              </div>
+            </div>
+            <div class="chat-header-actions">
+              <button id="audio-call-btn" class="action-btn" title="Голосовой вызов">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </button>
+              <button id="call-btn" class="action-btn" title="Видеозвонок">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+              </button>
+              <button id="screen-btn" class="action-btn" title="Скриншаринг">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+              </button>
+            </div>
+          </div>
+
+
+          <!-- Messages -->
+          <div id="messages-list">
+            <!-- Messages injected here -->
+          </div>
+
+          <!-- Input -->
+          <div class="chat-input-box">
+            <button id="file-btn" class="attach-btn" title="Отправить файл">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
+            <input type="file" id="file-input" style="display: none;" accept="image/*,video/*">
+            <input type="text" id="chat-input" placeholder="Написать сообщение...">
+            <button id="send-voice-btn" class="send-btn voice-mode" title="Голосовое сообщение">
+              <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3l0 0Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+              <svg id="send-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Call Screen -->
+    <div id="call-screen" class="call-screen" style="display: none; z-index: 2000;">
+      <div class="call-header">
+        <span id="call-user-name">Имя пользователя</span>
+        <span id="call-status">Звонок...</span>
+      </div>
+      
+      <div class="call-video-container">
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+      </div>
+      
+      <div class="call-controls">
+        <button id="call-toggle-audio" class="call-btn secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </button>
+        <button id="call-toggle-video" class="call-btn secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+        </button>
+        <button id="end-call-btn" class="call-btn decline">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="22" x2="2" y1="2" y2="22"/></svg>
+        </button>
+      </div>    
+    </div>
+
+    <!-- Incoming Call Modal -->
+    <div id="incoming-call-modal" class="incoming-call-screen" style="display: none; z-index: 3000;">
+      <div class="incoming-info">
+        <h2 id="caller-name">Кто-то звонит...</h2>
+        <p>Входящий вызов</p>
+      </div>
+      <div class="incoming-controls">
+        <button id="reject-call-btn" class="call-btn decline">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="22" x2="2" y1="2" y2="22"/></svg>
+        </button>
+        <button id="accept-call-btn" class="call-btn accept">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </button>
+      </div>    
+    </div>
+
+    <!-- Security Warning Modal -->
+    <div id="security-warning" class="glass-panel" style="display: none; z-index: 4000; width: 400px; max-width: 90vw; text-align: left;">
+      <h2 style="color: #ff4545; text-align: center;">⚠️ Внимание</h2>
+      <p style="color: white; font-size: 14px;">Orbits P2P — это приложение с прямой (децентрализованной) дистрибуцией. Аудио и видео звонки осуществляются напрямую (peer-to-peer).</p>
+      <button id="accept-security-btn" class="primary-btn" style="margin-top: 15px;">Я понимаю и доверяю</button>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+    <script>
+      if (localStorage.getItem('orbits_security_accepted') !== 'true') {
+        const modal = document.getElementById('security-warning');
+        const btn = document.getElementById('accept-security-btn');
+        modal.style.display = 'block';
+        btn.onclick = () => {
+          localStorage.setItem('orbits_security_accepted', 'true');
+          modal.style.display = 'none';
+        };
+      }
+    </script>
+  </body>
+</html>
