@@ -1,0 +1,6 @@
+{
+  "appId": "com.orbit.messenger.app",
+  "appName": "Orbit P2P",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
