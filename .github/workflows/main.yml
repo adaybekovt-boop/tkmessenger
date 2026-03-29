@@ -1,0 +1,106 @@
+name: Production Release CI/CD
+
+on:
+  push:
+    tags:
+      - 'v*' # Триггер: пуш тега (например, git tag v1.0.0 && git push origin v1.0.0)
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Build and Publish Windows (Electron)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run electron:build -- --publish always
+
+      - name: Generate Windows SHA256 Hash
+        run: Get-FileHash release/*Setup*.exe -Algorithm SHA256 | Out-File -Encoding UTF8 Orbit-Windows.sha256.txt
+
+      - name: Upload Windows Hash to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: Orbit-Windows.sha256.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-android:
+    runs-on: ubuntu-22.04 # Фиксируем версию ОС
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.10.0' # Строго фиксируем
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17.0.9' # Строго фиксируем
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: '8.4' # Фиксируем Gradle
+
+      - name: Install Dependencies
+        run: npm ci # Используем чистое фиксированное дерево зависимостей
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Add Capacitor Android Platform
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Build Android Release APK
+        working-directory: ./android
+        run: ./gradlew assembleRelease
+
+      # ЯВНАЯ ПОДПИСЬ APK В CI
+      - name: Sign APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_app
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Rename APK and Generate Hash
+        run: |
+          mv ${{steps.sign_app.outputs.signedReleaseFile}} Orbit-Messenger-Android.apk
+          sha256sum Orbit-Messenger-Android.apk > Orbit-Android.sha256.txt
+
+      - name: Upload APK and Hash to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            Orbit-Messenger-Android.apk
+            Orbit-Android.sha256.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # iOS пока исключен из MVP (закомментирован) чтобы не блокировать процесс сертификатами
+  # build-ios:
+  #   runs-on: macos-latest
+  #   steps: ...
