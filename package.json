@@ -1,0 +1,54 @@
+{
+  "name": "orbits",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "electron.mjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "electron:build": "vite build && electron-builder --publish never",
+    "dist": "npm run electron:build"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "vite": "^5.0.0",
+    "vite-plugin-singlefile": "^2.0.2"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
+    "electron-updater": "^6.1.7",
+    "peerjs": "^1.5.2"
+  },
+  "build": {
+    "appId": "com.orbit.messenger",
+    "productName": "Orbits P2P",
+
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron.mjs",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    }
+  }
+}
