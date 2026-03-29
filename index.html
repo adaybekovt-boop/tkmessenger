@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orbit P2P</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="orbit-space">
+      <div id="my-avatar" class="avatar my-avatar">
+        <span class="avatar-letter">Me</span>
+        <div class="aura my-aura"></div>
+      </div>
+      <div id="peers-container"></div>
+    </div>
+    
+    <div id="ui-panel" class="glass-panel" style="display: none;">
+      <h1>ORBIT</h1>
+      <p>Твой никнейм: <span id="my-id" style="color: var(--accent); font-family: monospace;">Загрузка...</span></p>
+      <input type="text" id="connect-id" placeholder="Никнейм друга...">
+      <button id="connect-btn">Притянуть на орбиту</button>
+      <div id="media-controls" style="display: flex; gap: 10px; margin-top: 10px;">
+        <button id="video-btn" class="media-btn">📷 Видео</button>
+        <button id="screen-btn" class="media-btn">💻 Экран</button>
+      </div>
+      <p id="status-text"></p>
+    </div>
+
+    <!-- Chat Panel -->
+    <div id="chat-panel" class="glass-panel" style="display: none; top: 30px; right: 30px; left: auto; height: calc(100vh - 120px); width: 350px; flex-direction: column;">
+      <h2 style="margin-top:0; font-size: 18px; color: var(--accent); margin-bottom: 10px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px;">Чат Орбиты</h2>
+      <div id="chat-messages" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; padding-right: 5px;">
+         <div style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: auto;">Здесь будут отображаться сообщения...</div>
+      </div>
+      <div style="display: flex; gap: 5px;">
+        <button id="file-btn" style="width: auto; margin-top: 0; padding: 10px;" title="Отправить медиа">📎</button>
+        <input type="file" id="file-input" style="display: none;" accept="image/*,video/*">
+        <input type="text" id="chat-input" placeholder="Сообщение..." style="margin-top: 0; flex: 1;">
+        <button id="send-btn" style="width: auto; margin-top: 0; padding: 10px 15px;">➤</button>
+      </div>
+    </div>
+    
+    <!-- Login Panel -->
+    <div id="login-panel" class="glass-panel" style="display: flex; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000; flex-direction: column; text-align: center;">
+      <h2 style="color: var(--accent); margin-top: 0;">Вход в Orbit</h2>
+      <p style="color: white; font-size: 14px;">Придумай себе уникальный никнейм</p>
+      <p style="color: var(--text-muted); font-size: 12px; margin-top: -5px;">(По этому нику тебя смогут найти друзья)</p>
+      <input type="text" id="nickname-input" placeholder="Например: space_ranger_99">
+      <button id="login-btn">Войти на орбиту</button>
+    </div>
+
+    <div id="security-warning" class="glass-panel" style="display: none; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; z-index: 1000; flex-direction: column; text-align: center;">
+      <h2 style="color: #ff4545; margin-top: 0;">⚠️ Внимание</h2>
+      <p style="color: white; font-size: 14px; text-align: left;">Orbit P2P — это приложение с прямой (децентрализованной) дистрибуцией без участия корпораций вроде Microsoft, Apple или Google.</p>
+      <p style="color: #8ba1b5; font-size: 13px; text-align: left;">Сборки не подписываются платными сертификатами. Ваша операционная система могла выдать предупреждение при запуске.</p>
+      <button id="accept-security-btn" style="margin-top: 20px;">Я понимаю и доверяю</button>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+    <script>
+      // Показываем предупреждение только при самом первом запуске
+      if (localStorage.getItem('orbit_security_accepted') !== 'true') {
+        const modal = document.getElementById('security-warning');
+        const btn = document.getElementById('accept-security-btn');
+        // Покажем поверх всего
+        modal.style.zIndex = '3000';
+        modal.style.display = 'flex';
+        btn.onclick = () => {
+          localStorage.setItem('orbit_security_accepted', 'true');
+          modal.style.display = 'none';
+        };
+      }
+    </script>
+  </body>
+</html>
