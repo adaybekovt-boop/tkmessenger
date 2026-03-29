@@ -75,20 +75,9 @@ jobs:
         working-directory: ./android
         run: ./gradlew assembleRelease
 
-      # ЯВНАЯ ПОДПИСЬ APK В CI
-      - name: Sign APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: android/app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-          alias: ${{ secrets.KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-
       - name: Rename APK and Generate Hash
         run: |
-          mv ${{steps.sign_app.outputs.signedReleaseFile}} Orbit-Messenger-Android.apk
+          mv android/app/build/outputs/apk/release/app-release-unsigned.apk Orbit-Messenger-Android.apk
           sha256sum Orbit-Messenger-Android.apk > Orbit-Android.sha256.txt
 
       - name: Upload APK and Hash to Release
