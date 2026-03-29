@@ -1,3 +1,4 @@
+
 name: Production Release CI/CD
 
 on:
@@ -23,23 +24,23 @@ jobs:
       - name: Build Web App
         run: npm run build
 
-      - name: Build and Publish Windows (Electron)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run electron:build -- --publish always
+      - name: Build Windows (Electron)
+        run: npm run electron:build
 
       - name: Generate Windows SHA256 Hash
         run: Get-FileHash release/*Setup*.exe -Algorithm SHA256 | Out-File -Encoding UTF8 Orbit-Windows.sha256.txt
 
-      - name: Upload Windows Hash to Release
+      - name: Upload Windows EXE and Hash to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: Orbit-Windows.sha256.txt
+          files: |
+            release/*Setup*.exe
+            Orbit-Windows.sha256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-android:
-    runs-on: ubuntu-22.04 # Фиксируем версию ОС
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -47,21 +48,21 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.10.0' # Строго фиксируем
+          node-version: '20.10.0'
 
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
-          java-version: '17.0.9' # Строго фиксируем
+          java-version: '17.0.9'
 
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
         with:
-          gradle-version: '8.4' # Фиксируем Gradle
+          gradle-version: '8.4'
 
       - name: Install Dependencies
-        run: npm ci # Используем чистое фиксированное дерево зависимостей
+        run: npm ci
 
       - name: Build Web App
         run: npm run build
@@ -71,13 +72,13 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Build Android Release APK
+      - name: Build Android Debug APK (Auto-signed)
         working-directory: ./android
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleDebug
 
       - name: Rename APK and Generate Hash
         run: |
-          mv android/app/build/outputs/apk/release/app-release-unsigned.apk Orbit-Messenger-Android.apk
+          mv android/app/build/outputs/apk/debug/app-debug.apk Orbit-Messenger-Android.apk
           sha256sum Orbit-Messenger-Android.apk > Orbit-Android.sha256.txt
 
       - name: Upload APK and Hash to Release
