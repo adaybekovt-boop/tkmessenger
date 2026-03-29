@@ -1,4 +1,3 @@
-
 name: Production Release CI/CD
 
 on:
@@ -27,7 +26,7 @@ jobs:
       - name: Build Windows (Electron)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run electron:build -- -c.publish=null
+        run: npm run electron:build
 
       - name: Generate Windows SHA256 Hash
         run: Get-FileHash release/*Setup*.exe -Algorithm SHA256 | Out-File -Encoding UTF8 Orbit-Windows.sha256.txt
