@@ -30,12 +30,7 @@
   "build": {
     "appId": "com.orbit.messenger",
     "productName": "Orbit P2P",
-    "publish": [
-      {
-        "provider": "github",
-        "releaseType": "release"
-      }
-    ],
+
     "directories": {
       "output": "release"
     },
