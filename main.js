@@ -46,19 +46,28 @@ const fileInput = document.getElementById('file-input');
 const ttlSelect = document.getElementById('ttl-select');
 const backBtn = document.getElementById('back-btn');
 const openSettingsBtn = document.getElementById('open-settings-btn');
+const openSettingsFab = document.getElementById('open-settings-fab');
+const bottomSettingsBtn = document.getElementById('bottom-settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 const saveSettingsBtn = document.getElementById('save-settings-btn');
 const settingsDisplayName = document.getElementById('settings-display-name');
+const settingsAvatarInput = document.getElementById('settings-avatar-input');
+const settingsAvatarPreview = document.getElementById('settings-avatar-preview');
 const micDeviceSelect = document.getElementById('mic-device-select');
 const echoCancelToggle = document.getElementById('echo-cancel-toggle');
 const noiseSuppressionToggle = document.getElementById('noise-suppression-toggle');
 const autoGainToggle = document.getElementById('auto-gain-toggle');
+const ringtoneToggle = document.getElementById('ringtone-toggle');
 const autoQualityToggle = document.getElementById('auto-quality-toggle');
 const videoQualitySelect = document.getElementById('video-quality-select');
 const typingIndicatorToggle = document.getElementById('typing-indicator-toggle');
+const themeSelect = document.getElementById('theme-select');
+const bubbleStyleSelect = document.getElementById('bubble-style-select');
 const runNetworkTestBtn = document.getElementById('run-network-test-btn');
 const networkTestResult = document.getElementById('network-test-result');
+const mailboxUrlInput = document.getElementById('mailbox-url-input');
+const mailboxKeyInput = document.getElementById('mailbox-key-input');
 const testMicBtn = document.getElementById('test-mic-btn');
 const stopMicTestBtn = document.getElementById('stop-mic-test-btn');
 const micLevelBar = document.getElementById('mic-level-bar');
@@ -74,6 +83,7 @@ const chatWarningBanner = document.getElementById('chat-warning-banner');
 const vaultLockModal = document.getElementById('vault-lock-modal');
 const unlockPasswordInput = document.getElementById('unlock-password-input');
 const unlockVaultBtn = document.getElementById('unlock-vault-btn');
+const myAvatarImage = document.getElementById('my-avatar-image');
 
 // Video Calls
 const callBtn = document.getElementById('call-btn');
@@ -303,16 +313,25 @@ let lockTimer = null;
 let hiddenAt = null;
 let outgoingChunkCache = new Map();
 const incomingTransfers = new Map();
+let outgoingRingToneHandle = null;
+let incomingRingToneHandle = null;
+let mailboxPollTimer = null;
 
 const defaultSettings = {
     displayName: '',
+    avatarData: '',
     micDeviceId: '',
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true,
+    callRingtone: true,
     autoQuality: true,
     videoQuality: 'medium',
+    mailboxUrl: '',
+    mailboxAnonKey: '',
     typingIndicator: true,
+    theme: 'space',
+    bubbleStyle: 'glass',
     duressPasswordHash: '',
     allowScreenshots: false
 };
@@ -325,6 +344,7 @@ let appSettings = {
 let trustState = JSON.parse(localStorage.getItem('orbit_trust') || '{}');
 let blockedPeers = JSON.parse(localStorage.getItem('orbit_blocked_peers') || '[]');
 let reportLog = JSON.parse(localStorage.getItem('orbit_report_log') || '[]');
+let peerProfiles = JSON.parse(localStorage.getItem('orbit_peer_profiles') || '{}');
 
 // Initialization
 const policyAccepted = localStorage.getItem('orbits_policy_accepted') === 'true';
@@ -365,6 +385,22 @@ if (privacyConsent) {
 
 if (openSettingsBtn) {
     openSettingsBtn.onclick = async () => {
+        settingsModal.style.display = 'flex';
+        settingsModal.setAttribute('aria-hidden', 'false');
+        syncSettingsFormFromState();
+        await populateMicDevices();
+    };
+}
+if (openSettingsFab) {
+    openSettingsFab.onclick = async () => {
+        settingsModal.style.display = 'flex';
+        settingsModal.setAttribute('aria-hidden', 'false');
+        syncSettingsFormFromState();
+        await populateMicDevices();
+    };
+}
+if (bottomSettingsBtn) {
+    bottomSettingsBtn.onclick = async () => {
         settingsModal.style.display = 'flex';
         settingsModal.setAttribute('aria-hidden', 'false');
         syncSettingsFormFromState();
@@ -412,10 +448,26 @@ if (saveSettingsBtn) {
         }
         saveSettings();
         applyProfileToUI();
+        applyThemeSettings();
+        broadcastMyProfile();
+        pollMailboxAndDeliver();
+        startMailboxPolling();
         await applyVideoQualityToLiveCall(appSettings.videoQuality);
         settingsModal.style.display = 'none';
         settingsModal.setAttribute('aria-hidden', 'true');
         stopMicTest();
+    };
+}
+if (settingsAvatarInput) {
+    settingsAvatarInput.onchange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            appSettings.avatarData = ev.target?.result || '';
+            settingsAvatarPreview.src = appSettings.avatarData;
+        };
+        reader.readAsDataURL(file);
     };
 }
 
@@ -471,6 +523,7 @@ if (panicWipeBtn) {
 }
 
 syncSettingsFormFromState();
+applyThemeSettings();
 
 await initDB();
 const savedNick = localStorage.getItem('orbit_nickname');
@@ -501,6 +554,8 @@ async function verifyAndUnlockVault(nick, password) {
 }
 
 function lockVault() {
+    // Do not lock the app in the middle of an active call.
+    if (activeCall) return;
     vaultKey = null;
     vaultLocked = true;
     vaultLockModal.style.display = 'flex';
@@ -550,6 +605,8 @@ function startOrbit(nick) {
     vaultLockModal.setAttribute('aria-hidden', 'true');
     
     applyProfileToUI();
+    peerProfiles[myNickname] = { displayName: getActiveDisplayName(), avatarData: appSettings.avatarData || '' };
+    persistPeerProfiles();
 
     // Создаем ключ
     peer = new Peer(myNickname);
@@ -560,6 +617,9 @@ function startOrbit(nick) {
         renderFriends();
         connectToAllFriends();
         applyNetworkState();
+        broadcastMyProfile();
+        pollMailboxAndDeliver();
+        startMailboxPolling();
     });
 
     peer.on('connection', (conn) => {
@@ -586,6 +646,7 @@ function startOrbit(nick) {
     });
 
     window.addEventListener('beforeunload', () => {
+       if (mailboxPollTimer) clearInterval(mailboxPollTimer);
        stopMicTest();
        if (activeCall) activeCall.close();
        Object.values(activeConnections).forEach(c => c.close());
@@ -643,6 +704,86 @@ async function flushOutgoingQueue() {
     }
     pendingOutgoing = rest;
     if (currentChatFriend) renderMessages();
+}
+
+function getMailboxConfig() {
+    return {
+        url: (appSettings.mailboxUrl || '').trim(),
+        key: (appSettings.mailboxAnonKey || '').trim()
+    };
+}
+
+async function pushToMailboxIfNeeded(to, payload) {
+    if (payload?.type !== 'text') return false;
+    const cfg = getMailboxConfig();
+    if (!cfg.url || !cfg.key) return false;
+    try {
+        const endpoint = `${cfg.url}/rest/v1/mailbox_messages`;
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': cfg.key,
+                'Authorization': `Bearer ${cfg.key}`,
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify([{
+                recipient: to,
+                sender: myNickname,
+                payload: payload,
+                created_at: new Date().toISOString()
+            }])
+        });
+        return res.ok;
+    } catch (_) {
+        return false;
+    }
+}
+
+async function pollMailboxAndDeliver() {
+    const cfg = getMailboxConfig();
+    if (!cfg.url || !cfg.key || !myNickname || isOffline || vaultLocked) return;
+    try {
+        const endpoint = `${cfg.url}/rest/v1/mailbox_messages?recipient=eq.${encodeURIComponent(myNickname)}&order=created_at.asc&limit=30`;
+        const res = await fetch(endpoint, {
+            headers: {
+                'apikey': cfg.key,
+                'Authorization': `Bearer ${cfg.key}`
+            }
+        });
+        if (!res.ok) return;
+        const rows = await res.json();
+        if (!Array.isArray(rows) || rows.length === 0) return;
+
+        const deliveredIds = [];
+        for (const row of rows) {
+            const payload = row.payload || {};
+            const sender = row.sender || payload.from;
+            if (!sender || payload.type !== 'text') continue;
+            await receiveMessage(sender, payload);
+            deliveredIds.push(row.id);
+        }
+
+        if (deliveredIds.length > 0) {
+            const inClause = deliveredIds.map((id) => `"${id}"`).join(',');
+            await fetch(`${cfg.url}/rest/v1/mailbox_messages?id=in.(${inClause})`, {
+                method: 'DELETE',
+                headers: {
+                    'apikey': cfg.key,
+                    'Authorization': `Bearer ${cfg.key}`
+                }
+            });
+        }
+    } catch (_) {
+        // silent mailbox polling errors
+    }
+}
+
+function startMailboxPolling() {
+    if (mailboxPollTimer) clearInterval(mailboxPollTimer);
+    mailboxPollTimer = setInterval(() => {
+        pollMailboxAndDeliver();
+    }, 8000);
 }
 
 function persistTrustState() {
@@ -717,9 +858,100 @@ function getActiveDisplayName() {
     return appSettings.displayName?.trim() || myNickname;
 }
 
+function getDisplayNameByPeer(peerId) {
+    if (peerId === myNickname) return getActiveDisplayName();
+    return peerProfiles[peerId]?.displayName || peerId;
+}
+
+function persistPeerProfiles() {
+    localStorage.setItem('orbit_peer_profiles', JSON.stringify(peerProfiles));
+}
+
 function applyProfileToUI() {
     myIdDisplay.textContent = getActiveDisplayName() || 'Пользователь';
     myAvatarLetter.textContent = (getActiveDisplayName() || 'U').substring(0, 2).toUpperCase();
+    if (appSettings.avatarData) {
+        myAvatarImage.src = appSettings.avatarData;
+        myAvatarImage.parentElement.classList.add('has-photo');
+    } else {
+        myAvatarImage.removeAttribute('src');
+        myAvatarImage.parentElement.classList.remove('has-photo');
+    }
+}
+
+function applyThemeSettings() {
+    document.body.classList.remove('theme-aurora', 'theme-deep', 'bubble-flat');
+    if (appSettings.theme === 'aurora') document.body.classList.add('theme-aurora');
+    if (appSettings.theme === 'deep') document.body.classList.add('theme-deep');
+    if (appSettings.bubbleStyle === 'flat') document.body.classList.add('bubble-flat');
+}
+
+function broadcastMyProfile() {
+    const payload = {
+        type: 'profile-update',
+        from: myNickname,
+        displayName: getActiveDisplayName(),
+        avatarData: appSettings.avatarData || ''
+    };
+    Object.values(activeConnections).forEach((conn) => {
+        if (conn && conn.open) conn.send(payload);
+    });
+}
+
+function startRingtone(kind) {
+    if (!appSettings.callRingtone) return null;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    const ctx = new Ctx();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.03;
+    gain.connect(ctx.destination);
+    let osc = null;
+    let timer = null;
+    const pattern = kind === 'incoming'
+        ? [700, 220, 700, 220, 1200]
+        : [500, 200, 500, 900];
+    let i = 0;
+    const tick = () => {
+        if (osc) {
+            osc.stop();
+            osc.disconnect();
+            osc = null;
+        }
+        if (i % 2 === 0) {
+            osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = kind === 'incoming' ? 880 : 660;
+            osc.connect(gain);
+            osc.start();
+        }
+        timer = window.setTimeout(() => {
+            i = (i + 1) % pattern.length;
+            tick();
+        }, pattern[i]);
+    };
+    tick();
+    return {
+        stop() {
+            if (timer) clearTimeout(timer);
+            if (osc) {
+                osc.stop();
+                osc.disconnect();
+            }
+            ctx.close();
+        }
+    };
+}
+
+function stopRingtone(handleRefName) {
+    if (handleRefName === 'out' && outgoingRingToneHandle) {
+        outgoingRingToneHandle.stop();
+        outgoingRingToneHandle = null;
+    }
+    if (handleRefName === 'in' && incomingRingToneHandle) {
+        incomingRingToneHandle.stop();
+        incomingRingToneHandle = null;
+    }
 }
 
 function getVideoConstraints(quality = appSettings.videoQuality) {
@@ -757,13 +989,19 @@ async function applyVideoQualityToLiveCall(quality) {
 
 function syncSettingsFormFromState() {
     settingsDisplayName.value = appSettings.displayName || '';
+    settingsAvatarPreview.src = appSettings.avatarData || '';
     micDeviceSelect.value = appSettings.micDeviceId || '';
     echoCancelToggle.checked = !!appSettings.echoCancellation;
     noiseSuppressionToggle.checked = !!appSettings.noiseSuppression;
     autoGainToggle.checked = !!appSettings.autoGainControl;
+    ringtoneToggle.checked = !!appSettings.callRingtone;
     autoQualityToggle.checked = !!appSettings.autoQuality;
     videoQualitySelect.value = appSettings.videoQuality || 'medium';
+    mailboxUrlInput.value = appSettings.mailboxUrl || '';
+    mailboxKeyInput.value = appSettings.mailboxAnonKey || '';
     typingIndicatorToggle.checked = !!appSettings.typingIndicator;
+    themeSelect.value = appSettings.theme || 'space';
+    bubbleStyleSelect.value = appSettings.bubbleStyle || 'glass';
     duressPasswordInput.value = '';
     allowScreenshotsToggle.checked = !!appSettings.allowScreenshots;
     videoQualitySelect.disabled = !!appSettings.autoQuality;
@@ -775,9 +1013,14 @@ function readSettingsFormToState() {
     appSettings.echoCancellation = echoCancelToggle.checked;
     appSettings.noiseSuppression = noiseSuppressionToggle.checked;
     appSettings.autoGainControl = autoGainToggle.checked;
+    appSettings.callRingtone = ringtoneToggle.checked;
     appSettings.autoQuality = autoQualityToggle.checked;
     appSettings.videoQuality = videoQualitySelect.value;
+    appSettings.mailboxUrl = mailboxUrlInput.value.trim();
+    appSettings.mailboxAnonKey = mailboxKeyInput.value.trim();
     appSettings.typingIndicator = typingIndicatorToggle.checked;
+    appSettings.theme = themeSelect.value;
+    appSettings.bubbleStyle = bubbleStyleSelect.value;
     appSettings.allowScreenshots = allowScreenshotsToggle.checked;
 }
 
@@ -907,6 +1150,7 @@ window.addEventListener('online', () => {
     applyNetworkState();
     connectToAllFriends();
     flushOutgoingQueue();
+    pollMailboxAndDeliver();
 });
 
 document.addEventListener('visibilitychange', () => {
@@ -914,12 +1158,12 @@ document.addEventListener('visibilitychange', () => {
         hiddenAt = Date.now();
         if (lockTimer) clearTimeout(lockTimer);
         lockTimer = setTimeout(() => {
-            if (document.hidden && myNickname) lockVault();
+            if (document.hidden && myNickname && !activeCall) lockVault();
         }, 5 * 60 * 1000);
     } else {
         if (lockTimer) clearTimeout(lockTimer);
         lockTimer = null;
-        if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000 && myNickname) {
+        if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000 && myNickname && !activeCall) {
             lockVault();
         }
     }
@@ -1010,6 +1254,12 @@ function handleIncomingConnection(conn) {
         persistTrustState();
         renderFriends();
         flushOutgoingQueue();
+        conn.send({
+            type: 'profile-update',
+            from: myNickname,
+            displayName: getActiveDisplayName(),
+            avatarData: appSettings.avatarData || ''
+        });
 
         conn.on('data', (data) => {
             receiveMessage(conn.peer, data);
@@ -1044,6 +1294,8 @@ async function renderFriends() {
         if (blockedPeers.includes(f.id)) continue;
         const isOnline = !!(activeConnections[f.id] && activeConnections[f.id].open);
         const trustData = getTrustBadgeData(f.id);
+        const displayName = getDisplayNameByPeer(f.id);
+        const avatarData = peerProfiles[f.id]?.avatarData || '';
         
         const key = `chat_${myNickname}_${f.id}`;
         const history = await getHistoryFromDB(key);
@@ -1062,7 +1314,7 @@ async function renderFriends() {
         
         const fName = document.createElement('div');
         fName.className = 'friend-name';
-        fName.textContent = f.name;
+        fName.textContent = displayName;
 
         const fPreview = document.createElement('span');
         fPreview.className = 'friend-preview-text';
@@ -1070,6 +1322,7 @@ async function renderFriends() {
 
         div.innerHTML = `
             <div class="friend-avatar">
+                <img class="avatar-photo" alt="avatar">
                 <span class="avatar-letter"></span>
                 <div class="friend-status ${isOnline ? 'online' : ''}"></div>
             </div>
@@ -1082,7 +1335,12 @@ async function renderFriends() {
                 <span class="friend-preview-text ${trustData.className}">${trustData.text}</span>
             </div>
         `;
-        div.querySelector('.avatar-letter').textContent = f.name.substring(0, 2).toUpperCase();
+        div.querySelector('.avatar-letter').textContent = displayName.substring(0, 2).toUpperCase();
+        if (avatarData) {
+            const avatar = div.querySelector('.avatar-photo');
+            avatar.src = avatarData;
+            div.querySelector('.friend-avatar').classList.add('has-photo');
+        }
         div.querySelector('.friend-name-container').replaceWith(fName);
         div.querySelector('.preview-container').replaceWith(fPreview);
 
@@ -1102,7 +1360,7 @@ function openChat(friendId) {
     appContainer.classList.add('chat-open');
     chatAreaEmpty.style.display = 'none';
     chatAreaActive.style.display = 'flex';
-    chatFriendName.textContent = friendId;
+    chatFriendName.textContent = getDisplayNameByPeer(friendId);
     if (isOffline) {
         document.getElementById('chat-friend-status').textContent = 'ожидание сети...';
         document.getElementById('chat-friend-status').style.color = 'var(--text-muted)';
@@ -1110,7 +1368,16 @@ function openChat(friendId) {
         document.getElementById('chat-friend-status').textContent = (activeConnections[friendId] && activeConnections[friendId].open) ? 'в сети' : 'не в сети';
         document.getElementById('chat-friend-status').style.color = (activeConnections[friendId] && activeConnections[friendId].open) ? 'var(--success)' : 'var(--text-muted)';
     }
-    currentChatAvatarText.textContent = friendId.substring(0,2).toUpperCase();
+    currentChatAvatarText.textContent = getDisplayNameByPeer(friendId).substring(0,2).toUpperCase();
+    if (peerProfiles[friendId]?.avatarData) {
+        currentChatAvatarText.style.backgroundImage = `url("${peerProfiles[friendId].avatarData}")`;
+        currentChatAvatarText.style.backgroundSize = 'cover';
+        currentChatAvatarText.style.backgroundPosition = 'center';
+        currentChatAvatarText.textContent = '';
+    } else {
+        currentChatAvatarText.style.backgroundImage = '';
+        currentChatAvatarText.textContent = getDisplayNameByPeer(friendId).substring(0,2).toUpperCase();
+    }
     updateTrustBadge(friendId);
     maybeShowNewUserWarning(friendId);
     
@@ -1309,7 +1576,6 @@ sendVoiceBtn.addEventListener('pointerup', async (e) => {
         }
     } else {
         // Send Text
-        if (isOffline) return;
         const text = chatInput.value.trim();
         if (!text) return;
         chatInput.value = '';
@@ -1336,7 +1602,9 @@ sendVoiceBtn.addEventListener('pointerup', async (e) => {
         if (canSendNow) {
             conn.send({ ...payload, from: myNickname, ttlMs: Number(ttlSelect.value || 0) });
         } else {
-            pendingOutgoing.push({ to: currentChatFriend, payload: { ...payload, from: myNickname, ttlMs: Number(ttlSelect.value || 0) } });
+            const queuedPayload = { ...payload, from: myNickname, ttlMs: Number(ttlSelect.value || 0) };
+            pendingOutgoing.push({ to: currentChatFriend, payload: queuedPayload });
+            pushToMailboxIfNeeded(currentChatFriend, queuedPayload);
         }
         scheduleTtlCleanup(currentChatFriend, payload.ts, Number(ttlSelect.value || 0));
     }
@@ -1394,6 +1662,18 @@ async function receiveMessage(senderId, data) {
             peerRtt[senderId] = rtt;
             updateCallStatusByRtt(senderId, rtt);
         }
+        return;
+    }
+    if (data.type === 'profile-update') {
+        peerProfiles[senderId] = {
+            displayName: data.displayName || senderId,
+            avatarData: data.avatarData || ''
+        };
+        persistPeerProfiles();
+        if (currentChatFriend === senderId) {
+            chatFriendName.textContent = getDisplayNameByPeer(senderId);
+        }
+        renderFriends();
         return;
     }
     
@@ -1622,6 +1902,8 @@ function handleIncomingCall(call) {
     incomingCallTmp = call;
     callerNameDisplay.textContent = `${call.peer} ${t.caller}`;
     incomingCallModal.style.display = 'flex';
+    stopRingtone('in');
+    incomingRingToneHandle = startRingtone('incoming');
     if (window.Notification && Notification.permission === 'granted') {
         new Notification(t.incoming, { body: `${call.peer} ${t.caller}`, icon: '/favicon.ico' });
     }
@@ -1629,6 +1911,7 @@ function handleIncomingCall(call) {
 
 acceptCallBtn.onclick = () => {
     incomingCallModal.style.display = 'none';
+    stopRingtone('in');
     if (!incomingCallTmp) return;
 
     navigator.mediaDevices.getUserMedia({ audio: getAudioConstraints(), video: getVideoConstraints(appSettings.videoQuality) }).catch(err => {
@@ -1664,6 +1947,7 @@ acceptCallBtn.onclick = () => {
 
 rejectCallBtn.onclick = () => {
     incomingCallModal.style.display = 'none';
+    stopRingtone('in');
     if(incomingCallTmp) incomingCallTmp.close();
     incomingCallTmp = null;
 };
@@ -1714,16 +1998,19 @@ async function startCall(videoOn, audioOn, screenStream = null) {
 
     localVideo.srcObject = localStream;
     activeCall = peer.call(currentChatFriend, localStream);
+    stopRingtone('out');
+    outgoingRingToneHandle = startRingtone('outgoing');
     callUserName.textContent = currentChatFriend;
     callStatus.textContent = 'Соединение...';
     callScreen.style.display = 'flex';
     bindRemoteVideoStatus();
 
     activeCall.on('stream', (remoteStream) => {
+        stopRingtone('out');
         remoteVideo.srcObject = remoteStream;
         callStatus.textContent = 'В звонке';
     });
-    activeCall.on('error', (err) => { alert('Связь прервалась.'); closeCallUI(); });
+    activeCall.on('error', (err) => { stopRingtone('out'); alert('Связь прервалась.'); closeCallUI(); });
     activeCall.on('close', closeCallUI);
 }
 
@@ -1755,6 +2042,8 @@ endCallBtn.onclick = () => {
 };
 
 function closeCallUI() {
+    stopRingtone('out');
+    stopRingtone('in');
     callScreen.style.display = 'none';
     if (localStream) {
         localStream.getTracks().forEach(t => t.stop());
