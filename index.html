@@ -11,6 +11,7 @@
     <div id="login-panel" class="glass-panel">
       <div class="brand-orbit-logo" aria-hidden="true"></div>
       <h2>Orbits P2P</h2>
+      <p class="brand-slogan">Stay in orbit</p>
       <p>Добро пожаловать в децентрализованную сеть. Создай уникальный позывной.</p>
       <input type="text" id="nickname-input" placeholder="твой_никнейм">
       <input type="password" id="password-input" placeholder="мастер-пароль">
@@ -36,17 +37,24 @@
           <input type="text" id="add-friend-input" placeholder="Ник друга...">
           <button id="add-friend-btn">+</button>
         </div>
+        <div class="chats-title">Chats</div>
         <div id="friends-list">
           <!-- Friends will be generated here by JS -->
         </div>
         <div id="my-profile">
           <div class="friend-avatar">
+            <img id="my-avatar-image" class="avatar-photo" alt="my avatar">
             <span id="my-avatar-letter">Me</span>
           </div>
           <div class="my-info">
             <span id="my-id-display">Загрузка...</span>
             <span class="status-online" id="my-status">В сети</span>
           </div>
+        </div>
+        <div id="bottom-nav">
+          <button class="nav-btn active">Chats</button>
+          <button class="nav-btn">Contacts</button>
+          <button id="bottom-settings-btn" class="nav-btn">Settings</button>
         </div>
       </div>
 
@@ -114,6 +122,9 @@
         </div>
       </div>
     </div>
+    <button id="open-settings-fab" class="settings-fab" title="Настройки">
+      ⚙
+    </button>
 
     <!-- Report Modal -->
     <div id="report-modal" class="policy-modal" style="display: none;" aria-hidden="true">
@@ -204,6 +215,11 @@
         <div class="settings-grid">
           <section class="settings-card">
             <h3>Профиль</h3>
+            <label class="settings-label" for="settings-avatar-input">Аватар</label>
+            <div class="settings-avatar-row">
+              <img id="settings-avatar-preview" class="settings-avatar-preview" alt="avatar preview">
+              <input id="settings-avatar-input" type="file" accept="image/*">
+            </div>
             <label class="settings-label" for="settings-display-name">Отображаемое имя</label>
             <input id="settings-display-name" type="text" placeholder="Как тебя видят в приложении">
             <p class="settings-note">Можно оставить никнейм. Это имя только для вашего интерфейса.</p>
@@ -218,6 +234,7 @@
             <label class="toggle-row"><input type="checkbox" id="echo-cancel-toggle" checked><span>Эхо-подавление</span></label>
             <label class="toggle-row"><input type="checkbox" id="noise-suppression-toggle" checked><span>Шумоподавление</span></label>
             <label class="toggle-row"><input type="checkbox" id="auto-gain-toggle" checked><span>Авто-усиление микрофона</span></label>
+            <label class="toggle-row"><input type="checkbox" id="ringtone-toggle" checked><span>Рингтоны при вызовах</span></label>
             <div class="settings-actions-row">
               <button id="test-mic-btn" class="secondary-policy-btn" type="button">Тест микрофона</button>
               <button id="stop-mic-test-btn" class="secondary-policy-btn" type="button">Стоп</button>
@@ -238,11 +255,26 @@
               <button id="run-network-test-btn" class="primary-btn" type="button">Тест сети и автонастройка</button>
             </div>
             <p id="network-test-result" class="settings-note">Нажми тест, чтобы оценить интернет и подобрать качество.</p>
+            <label class="settings-label" for="mailbox-url-input">Supabase URL (offline mailbox)</label>
+            <input id="mailbox-url-input" type="text" placeholder="https://xxxx.supabase.co">
+            <label class="settings-label" for="mailbox-key-input">Supabase anon key</label>
+            <input id="mailbox-key-input" type="password" placeholder="eyJhbGciOi...">
           </section>
 
           <section class="settings-card">
             <h3>Интерфейс</h3>
             <label class="toggle-row"><input type="checkbox" id="typing-indicator-toggle" checked><span>Показывать статус «печатает...»</span></label>
+            <label class="settings-label" for="theme-select">Тема</label>
+            <select id="theme-select">
+              <option value="space">Space (default)</option>
+              <option value="aurora">Aurora</option>
+              <option value="deep">Deep Night</option>
+            </select>
+            <label class="settings-label" for="bubble-style-select">Стиль пузырей</label>
+            <select id="bubble-style-select">
+              <option value="glass">Glass</option>
+              <option value="flat">Flat</option>
+            </select>
             <p class="settings-note">Сделали более "живой" вид как в Discord: больше контроля, меньше "сухости".</p>
           </section>
 
