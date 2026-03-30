@@ -156,7 +156,7 @@ function startOrbit(nick) {
     appContainer.style.display = 'flex';
     
     myIdDisplay.textContent = myNickname;
-    myAvatarLetter.innerHTML = myNickname.substring(0, 2).toUpperCase();
+    myAvatarLetter.textContent = myNickname.substring(0, 2).toUpperCase();
 
     // Создаем ключ
     peer = new Peer(myNickname);
@@ -197,11 +197,29 @@ function startOrbit(nick) {
     });
 }
 
+let lastHeartbeat = {};
+
 function connectToAllFriends() {
     friends.forEach(f => tryConnect(f.id));
-    // Пингуем список каждые 10 секунд (переподключение)
     setInterval(() => {
-        friends.forEach(f => tryConnect(f.id));
+        const now = Date.now();
+        friends.forEach(f => {
+            const conn = activeConnections[f.id];
+            if (conn && conn.open) {
+                conn.send({ type: 'ping', from: myNickname });
+                if (lastHeartbeat[f.id] && (now - lastHeartbeat[f.id] > 30000)) {
+                    conn.close();
+                    delete activeConnections[f.id];
+                    if (currentChatFriend === f.id) {
+                        document.getElementById('chat-friend-status').textContent = 'не в сети';
+                        document.getElementById('chat-friend-status').style.color = 'var(--text-muted)';
+                    }
+                    renderFriends();
+                }
+            } else {
+                tryConnect(f.id);
+            }
+        });
     }, 10000);
 }
 
@@ -248,6 +266,7 @@ addFriendBtn.onclick = () => { addFriend(addFriendInput.value); addFriendInput.v
 function handleIncomingConnection(conn) {
     conn.on('open', () => {
         activeConnections[conn.peer] = conn;
+        lastHeartbeat[conn.peer] = Date.now();
         // Автоматически добавляем в друзья если кто-то написал/подключился
         if (!friends.find(f => f.id === conn.peer)) {
             friends.push({ id: conn.peer, name: conn.peer });
@@ -299,19 +318,31 @@ async function renderFriends() {
         div.className = 'friend-item';
         if (currentChatFriend === f.id) div.classList.add('active');
         
+        const fName = document.createElement('div');
+        fName.className = 'friend-name';
+        fName.textContent = f.name;
+
+        const fPreview = document.createElement('span');
+        fPreview.className = 'friend-preview-text';
+        fPreview.textContent = preview;
+
         div.innerHTML = `
             <div class="friend-avatar">
-                <span>${f.name.substring(0,2).toUpperCase()}</span>
+                <span class="avatar-letter"></span>
                 <div class="friend-status ${isOnline ? 'online' : ''}"></div>
             </div>
             <div class="friend-info-col">
-                <div class="friend-name">${f.name}</div>
+                <div class="friend-name-container"></div>
                 <div class="friend-preview-row">
-                    <span class="friend-preview-text">${preview}</span>
+                    <span class="preview-container"></span>
                     <span class="friend-time">${timeStr}</span>
                 </div>
             </div>
         `;
+        div.querySelector('.avatar-letter').textContent = f.name.substring(0, 2).toUpperCase();
+        div.querySelector('.friend-name-container').replaceWith(fName);
+        div.querySelector('.preview-container').replaceWith(fPreview);
+
         div.onclick = () => openChat(f.id);
         friendsListContainer.appendChild(div);
     }
@@ -327,7 +358,7 @@ function openChat(friendId) {
     chatFriendName.textContent = friendId;
     document.getElementById('chat-friend-status').textContent = (activeConnections[friendId] && activeConnections[friendId].open) ? 'в сети' : 'не в сети';
     document.getElementById('chat-friend-status').style.color = (activeConnections[friendId] && activeConnections[friendId].open) ? 'var(--success)' : 'var(--text-muted)';
-    currentChatAvatarText.innerHTML = friendId.substring(0,2).toUpperCase();
+    currentChatAvatarText.textContent = friendId.substring(0,2).toUpperCase();
     
     if (!activeConnections[friendId] || !activeConnections[friendId].open) {
         tryConnect(friendId);
@@ -355,13 +386,29 @@ async function renderMessages() {
         if (msg.type === 'text') {
             div.textContent = msg.content;
         } else if (msg.type === 'image') {
-            div.innerHTML = `<img src="${msg.content}" style="max-width:100%; border-radius:8px;">`;
+            const img = document.createElement('img');
+            img.src = msg.content;
+            img.style.cssText = 'max-width:100%; border-radius:8px;';
+            div.appendChild(img);
         } else if (msg.type === 'video') {
-            div.innerHTML = `<video src="${msg.content}" controls style="max-width:100%; border-radius:8px;"></video>`;
+            const vid = document.createElement('video');
+            vid.src = msg.content;
+            vid.controls = true;
+            vid.style.cssText = 'max-width:100%; border-radius:8px;';
+            div.appendChild(vid);
         } else if (msg.type === 'file') {
-             div.innerHTML = `<a href="${msg.content}" download="${msg.name || 'file'}" style="color:var(--accent); text-decoration:underline;">📎 Скачать ${msg.name || 'файл'}</a>`;
+            const a = document.createElement('a');
+            a.href = msg.content;
+            a.download = msg.name || 'file';
+            a.style.cssText = 'color:var(--accent); text-decoration:underline;';
+            a.textContent = `📎 Скачать ${msg.name || 'файл'}`;
+            div.appendChild(a);
         } else if (msg.type === 'audio') {
-             div.innerHTML = `<audio src="${msg.content}" controls style="max-width: 200px; height: 40px; border-radius: 20px; outline: none;"></audio>`;
+            const aud = document.createElement('audio');
+            aud.src = msg.content;
+            aud.controls = true;
+            aud.style.cssText = 'max-width: 200px; height: 40px; border-radius: 20px; outline: none;';
+            div.appendChild(aud);
         }
         
         const time = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -375,7 +422,16 @@ async function renderMessages() {
 
         const timeDiv = document.createElement('div');
         timeDiv.className = 'msg-time';
-        timeDiv.innerHTML = `${statusStr}${time}`;
+        
+        if (statusStr) {
+            const wrapper = document.createElement('span');
+            wrapper.innerHTML = statusStr; // safe, as statusStr contains static HTML ✓✓
+            timeDiv.appendChild(wrapper.firstChild);
+        }
+        const timeSpan = document.createElement('span');
+        timeSpan.textContent = ' ' + time;
+        timeDiv.appendChild(timeSpan);
+
         div.appendChild(timeDiv);
 
         messagesList.appendChild(div);
@@ -488,6 +544,7 @@ sendVoiceBtn.addEventListener('pointerup', async (e) => {
     }
 });
 
+let typingTimeout = null;
 chatInput.addEventListener('input', () => {
     if (chatInput.value.trim().length > 0 && recordingState === 'idle') {
         sendVoiceBtn.classList.remove('voice-mode');
@@ -497,6 +554,13 @@ chatInput.addEventListener('input', () => {
         sendVoiceBtn.classList.add('voice-mode');
         micIcon.style.display = 'block';
         sendIcon.style.display = 'none';
+    }
+    
+    if (currentChatFriend) {
+        const conn = activeConnections[currentChatFriend];
+        if (conn && conn.open) conn.send({ type: 'typing', from: myNickname });
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {}, 2000);
     }
 });
 
@@ -516,6 +580,29 @@ function sendAck(senderId, msgTs) {
 }
 
 async function receiveMessage(senderId, data) {
+    lastHeartbeat[senderId] = Date.now();
+    
+    if (data.type === 'ping') {
+        const conn = activeConnections[senderId];
+        if (conn && conn.open) conn.send({ type: 'pong', from: myNickname });
+        return;
+    }
+    if (data.type === 'pong') return;
+    
+    if (data.type === 'typing') {
+        if (currentChatFriend === senderId) {
+            document.getElementById('chat-friend-status').textContent = 'печатает...';
+            document.getElementById('chat-friend-status').style.color = 'var(--success)';
+            clearTimeout(window[`typing_${senderId}`]);
+            window[`typing_${senderId}`] = setTimeout(() => {
+                const conn = activeConnections[senderId];
+                document.getElementById('chat-friend-status').textContent = (conn && conn.open) ? 'в сети' : 'не в сети';
+                document.getElementById('chat-friend-status').style.color = (conn && conn.open) ? 'var(--success)' : 'var(--text-muted)';
+            }, 3000);
+        }
+        return;
+    }
+    
     if (data.type === 'ack') {
         await updateMsgStatusInDB(`chat_${myNickname}_${senderId}`, data.id, data.status);
         if (currentChatFriend === senderId) renderMessages();
