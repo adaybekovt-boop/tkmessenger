@@ -1,0 +1,39 @@
+name: Build Native IPA (Orbits iOS)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Клонирование репозитория
+      uses: actions/checkout@v4
+
+    - name: Установка платформы Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+
+    - name: Кодогенерация и Сборка iOS без подписи
+      run: |
+        cd orbits_native
+        flutter create . --platforms ios
+        flutter pub get
+        flutter build ios --release --no-codesign
+        
+    - name: Упаковка в .ipa для Sideloading (AltStore / TrollStore)
+      run: |
+        cd orbits_native/build/ios/iphoneos
+        mkdir Payload
+        mv Runner.app Payload/
+        zip -r Orbits_iOS.ipa Payload/
+
+    - name: Сохранение .ipa файла (Артефакты)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Orbits_Native_iOS_IPA
+        path: orbits_native/build/ios/iphoneos/Orbits_iOS.ipa
