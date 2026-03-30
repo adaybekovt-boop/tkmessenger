@@ -1,3 +1,4 @@
+
 {
   "name": "orbits",
   "private": true,
@@ -8,7 +9,7 @@
   "main": "electron.mjs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OWNER/REPO.git"
+    "url": "https://github.com/adaybekovt-boop/tkmessenger.git"
   },
   "scripts": {
     "dev": "vite",
@@ -56,6 +57,11 @@
       "target": [
         "dmg"
       ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "adaybekovt-boop",
+      "repo": "tkmessenger"
     }
   }
 }
