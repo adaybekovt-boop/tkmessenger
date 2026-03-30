@@ -1,0 +1,32 @@
+name: Build Native EXE (Orbits)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Клонирование репозитория
+      uses: actions/checkout@v4
+
+    - name: Установка платформы Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+
+    - name: Кодогенерация и Сборка EXE
+      run: |
+        cd orbits_native
+        flutter create . --platforms windows
+        flutter pub get
+        flutter build windows --release
+
+    - name: Сохранение .exe файла (Артефакты)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Orbits_Native_Windows_EXE
+        path: orbits_native/build/windows/x64/runner/Release/
