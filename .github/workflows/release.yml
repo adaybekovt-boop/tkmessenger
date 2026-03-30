@@ -21,7 +21,7 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web App
         run: npm run build
@@ -29,7 +29,6 @@ jobs:
       - name: Build Windows (Electron)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run electron:build
 
       - name: Generate Windows SHA256 Hash
@@ -97,6 +96,41 @@ jobs:
           files: |
             Orbit-Messenger-Android.apk
             Orbit-Android.sha256.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Build macOS (Electron)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run electron:build
+
+      - name: Generate macOS SHA256 Hash
+        run: shasum -a 256 release/*.dmg > Orbit-macOS.sha256.txt
+
+      - name: Upload macOS DMG and Hash to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/*.dmg
+            Orbit-macOS.sha256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
