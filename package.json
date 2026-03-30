@@ -1,0 +1,71 @@
+{
+  "name": "orbits-p2p",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Orbits P2P — веб (GitHub Pages), Electron (Windows/macOS), Android (Capacitor)",
+  "author": "Orbits Team",
+  "type": "module",
+  "main": "electron.mjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adaybekovt-boop/tkmessenger.git"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "electron:build": "vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never",
+    "dist": "npm run electron:build",
+    "cap:sync": "npm run build && npx cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
+    "electron-updater": "^6.1.7",
+    "peerjs": "^1.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "terser": "^5.46.1",
+    "vite": "^5.4.0"
+  },
+  "build": {
+    "appId": "com.orbit.messenger",
+    "productName": "Orbit P2P",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron.mjs",
+      "preload.cjs",
+      "splash.html",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "adaybekovt-boop",
+      "repo": "tkmessenger"
+    }
+  }
+}
