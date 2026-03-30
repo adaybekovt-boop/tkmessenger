@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Orbits P2P</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <!-- Login Panel -->
+    <div id="login-panel" class="glass-panel">
+      <div class="brand-orbit-logo" aria-hidden="true"></div>
+      <h2>Orbits P2P</h2>
+      <p>Добро пожаловать в децентрализованную сеть. Создай уникальный позывной.</p>
+      <input type="text" id="nickname-input" placeholder="твой_никнейм">
+      <input type="password" id="password-input" placeholder="мастер-пароль">
+      <label class="consent-row" for="privacy-consent">
+        <input type="checkbox" id="privacy-consent">
+        <span>Я принимаю Политику конфиденциальности</span>
+      </label>
+      <button id="open-policy-btn" type="button" class="secondary-policy-btn">Открыть политику</button>
+      <button id="login-btn" class="primary-btn">Войти в сеть</button>
+    </div>
+
+    <!-- App Container -->
+    <div id="app-container" style="display: none;">
+      <!-- Sidebar / Friend List -->
+      <div id="sidebar">
+        <div class="sidebar-header">
+          <span>ORBITS</span>
+          <button id="open-settings-btn" class="action-btn" title="Настройки">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a2 2 0 0 1 2 2v.11a7.98 7.98 0 0 1 2.16.9l.08-.08a2 2 0 1 1 2.83 2.83l-.08.08a7.98 7.98 0 0 1 .9 2.16H20a2 2 0 1 1 0 4h-.11a7.98 7.98 0 0 1-.9 2.16l.08.08a2 2 0 1 1-2.83 2.83l-.08-.08a7.98 7.98 0 0 1-2.16.9V19a2 2 0 1 1-4 0v-.11a7.98 7.98 0 0 1-2.16-.9l-.08.08a2 2 0 1 1-2.83-2.83l.08-.08a7.98 7.98 0 0 1-.9-2.16H5a2 2 0 1 1 0-4h.11a7.98 7.98 0 0 1 .9-2.16l-.08-.08a2 2 0 1 1 2.83-2.83l.08.08a7.98 7.98 0 0 1 2.16-.9V5a2 2 0 0 1 2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="add-friend-box">
+          <input type="text" id="add-friend-input" placeholder="Ник друга...">
+          <button id="add-friend-btn">+</button>
+        </div>
+        <div id="friends-list">
+          <!-- Friends will be generated here by JS -->
+        </div>
+        <div id="my-profile">
+          <div class="friend-avatar">
+            <span id="my-avatar-letter">Me</span>
+          </div>
+          <div class="my-info">
+            <span id="my-id-display">Загрузка...</span>
+            <span class="status-online" id="my-status">В сети</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Chat Area -->
+      <div id="chat-area">
+        <div id="empty-state">
+          <span style="font-size: 64px;">🌌</span>
+          <p>Выберите друга, чтобы начать общение</p>
+        </div>
+
+        <div id="active-chat" style="display: none;">
+          <div class="chat-header">
+            <div class="chat-header-info">
+              <button id="back-btn" class="action-btn back-btn" title="Назад" style="margin-right: 10px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div class="friend-avatar" id="current-chat-avatar">F</div>
+              <div class="chat-header-text">
+                <span id="chat-friend-name">Ник друга</span>
+                <span id="chat-friend-status" class="chat-status-text">в сети</span>
+              </div>
+              <span id="trust-badge" class="trust-badge trust-neutral">Щит: ?</span>
+            </div>
+            <div class="chat-header-actions">
+              <button id="report-peer-btn" class="action-btn" title="Пожаловаться">
+                <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18"/><path d="M5 5h10l-1.5 3L15 11H5z"/></svg>
+              </button>
+              <button id="audio-call-btn" class="action-btn" title="Голосовой вызов">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </button>
+              <button id="call-btn" class="action-btn" title="Видеозвонок">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+              </button>
+              <button id="screen-btn" class="action-btn" title="Скриншаринг">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+              </button>
+            </div>
+          </div>
+
+
+          <!-- Messages -->
+          <div id="messages-list">
+            <!-- Messages injected here -->
+          </div>
+          <div id="chat-warning-banner" class="chat-warning-banner" style="display:none;"></div>
+
+          <!-- Input -->
+          <div class="chat-input-box">
+            <button id="file-btn" class="attach-btn" title="Отправить файл">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
+            <input type="file" id="file-input" style="display: none;" accept="image/*,video/*">
+            <select id="ttl-select" class="ttl-select" title="Время жизни сообщений">
+              <option value="0">TTL: выкл</option>
+              <option value="30000">TTL: 30с</option>
+              <option value="60000">TTL: 1м</option>
+              <option value="3600000">TTL: 1ч</option>
+            </select>
+            <input type="text" id="chat-input" placeholder="Написать сообщение...">
+            <button id="send-voice-btn" class="send-btn voice-mode" title="Голосовое сообщение">
+              <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3l0 0Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+              <svg id="send-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div id="report-modal" class="policy-modal" style="display: none;" aria-hidden="true">
+      <div class="policy-dialog">
+        <h2>Жалоба на пользователя</h2>
+        <p class="settings-note">Выберите причину. Пользователь будет автоматически заблокирован локально.</p>
+        <div class="report-reasons">
+          <label class="toggle-row"><input type="radio" name="report-reason" value="spam" checked><span>Спам</span></label>
+          <label class="toggle-row"><input type="radio" name="report-reason" value="fraud"><span>Мошенничество</span></label>
+          <label class="toggle-row"><input type="radio" name="report-reason" value="abuse"><span>Оскорбления</span></label>
+        </div>
+        <div class="policy-actions">
+          <button id="close-report-btn" type="button" class="secondary-policy-btn">Отмена</button>
+          <button id="submit-report-btn" type="button" class="primary-btn">Пожаловаться и блокировать</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Call Screen -->
+    <div id="call-screen" class="call-screen" style="display: none; z-index: 2000;">
+      <div class="call-header">
+        <span id="call-user-name">Имя пользователя</span>
+        <span id="call-status">Звонок...</span>
+      </div>
+      
+      <div class="call-video-container">
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+      </div>
+      
+      <div class="call-controls">
+        <button id="call-toggle-audio" class="call-btn secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </button>
+        <button id="call-toggle-video" class="call-btn secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+        </button>
+        <button id="end-call-btn" class="call-btn decline">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="22" x2="2" y1="2" y2="22"/></svg>
+        </button>
+      </div>    
+    </div>
+
+    <!-- Incoming Call Modal -->
+    <div id="incoming-call-modal" class="incoming-call-screen" style="display: none; z-index: 3000;">
+      <div class="incoming-info">
+        <h2 id="caller-name">Кто-то звонит...</h2>
+        <p>Входящий вызов</p>
+      </div>
+      <div class="incoming-controls">
+        <button id="reject-call-btn" class="call-btn decline">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="22" x2="2" y1="2" y2="22"/></svg>
+        </button>
+        <button id="accept-call-btn" class="call-btn accept">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </button>
+      </div>    
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="policy-modal" class="policy-modal" style="display: none;" aria-hidden="true">
+      <div class="policy-dialog">
+        <h2>Политика конфиденциальности</h2>
+        <div id="policy-scrollbox" class="policy-scrollbox">
+          <p><strong>Нулевой сервер:</strong> Orbits не хранит ваши сообщения, ключи или медиафайлы на централизованных серверах.</p>
+          <p><strong>Локальный контроль:</strong> История переписки хранится локально на вашем устройстве.</p>
+          <p><strong>Ответственность:</strong> При утере пароля доступ восстановить невозможно, так как централизованного реестра нет.</p>
+          <p><strong>Технические логи:</strong> Для установления P2P соединения используются только технические метаданные (ID узла, тип NAT).</p>
+          <p><strong>Screen Privacy:</strong> В приложении используется защита от несанкционированного копирования интерфейса, где это поддерживается ОС.</p>
+          <p>Продолжая использование, вы подтверждаете, что понимаете риски и принимаете условия использования приложения.</p>
+        </div>
+        <div class="policy-actions">
+          <button id="close-policy-btn" type="button" class="secondary-policy-btn">Закрыть</button>
+          <button id="accept-policy-btn" type="button" class="primary-btn">Принять и продолжить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="settings-modal" style="display:none;" aria-hidden="true">
+      <div class="settings-dialog">
+        <div class="settings-head">
+          <h2>Настройки Orbits</h2>
+          <button id="close-settings-btn" class="action-btn" title="Закрыть">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <div class="settings-grid">
+          <section class="settings-card">
+            <h3>Профиль</h3>
+            <label class="settings-label" for="settings-display-name">Отображаемое имя</label>
+            <input id="settings-display-name" type="text" placeholder="Как тебя видят в приложении">
+            <p class="settings-note">Можно оставить никнейм. Это имя только для вашего интерфейса.</p>
+          </section>
+
+          <section class="settings-card">
+            <h3>Микрофон и звук</h3>
+            <label class="settings-label" for="mic-device-select">Устройство ввода</label>
+            <select id="mic-device-select">
+              <option value="">По умолчанию</option>
+            </select>
+            <label class="toggle-row"><input type="checkbox" id="echo-cancel-toggle" checked><span>Эхо-подавление</span></label>
+            <label class="toggle-row"><input type="checkbox" id="noise-suppression-toggle" checked><span>Шумоподавление</span></label>
+            <label class="toggle-row"><input type="checkbox" id="auto-gain-toggle" checked><span>Авто-усиление микрофона</span></label>
+            <div class="settings-actions-row">
+              <button id="test-mic-btn" class="secondary-policy-btn" type="button">Тест микрофона</button>
+              <button id="stop-mic-test-btn" class="secondary-policy-btn" type="button">Стоп</button>
+            </div>
+            <div class="mic-level-wrap"><div id="mic-level-bar"></div></div>
+          </section>
+
+          <section class="settings-card">
+            <h3>Сеть и качество</h3>
+            <label class="toggle-row"><input type="checkbox" id="auto-quality-toggle" checked><span>Авто-качество видео</span></label>
+            <label class="settings-label" for="video-quality-select">Ручной пресет (если авто выключен)</label>
+            <select id="video-quality-select">
+              <option value="low">Low (320p)</option>
+              <option value="medium">Medium (360p)</option>
+              <option value="high">High (720p)</option>
+            </select>
+            <div class="settings-actions-row">
+              <button id="run-network-test-btn" class="primary-btn" type="button">Тест сети и автонастройка</button>
+            </div>
+            <p id="network-test-result" class="settings-note">Нажми тест, чтобы оценить интернет и подобрать качество.</p>
+          </section>
+
+          <section class="settings-card">
+            <h3>Интерфейс</h3>
+            <label class="toggle-row"><input type="checkbox" id="typing-indicator-toggle" checked><span>Показывать статус «печатает...»</span></label>
+            <p class="settings-note">Сделали более "живой" вид как в Discord: больше контроля, меньше "сухости".</p>
+          </section>
+
+          <section class="settings-card">
+            <h3>Безопасность</h3>
+            <label class="settings-label" for="duress-password-input">Лже-пароль (Duress Password)</label>
+            <input id="duress-password-input" type="password" placeholder="Откроет пустой профиль">
+            <label class="toggle-row"><input type="checkbox" id="allow-screenshots-toggle"><span>Разрешить скриншоты (где возможно)</span></label>
+            <button id="panic-wipe-btn" class="secondary-policy-btn" type="button">Уничтожить все данные</button>
+          </section>
+        </div>
+        <div class="settings-footer">
+          <button id="save-settings-btn" class="primary-btn" type="button">Сохранить настройки</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vault Lock Modal -->
+    <div id="vault-lock-modal" class="policy-modal" style="display:none;" aria-hidden="true">
+      <div class="policy-dialog">
+        <h2>Сессия заблокирована</h2>
+        <p class="settings-note">Приложение было свернуто более 5 минут. Введите мастер-пароль.</p>
+        <input id="unlock-password-input" type="password" placeholder="мастер-пароль">
+        <div class="policy-actions">
+          <button id="unlock-vault-btn" type="button" class="primary-btn">Разблокировать</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
