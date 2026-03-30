@@ -606,18 +606,38 @@ if (panicWipeBtn) {
 
 syncSettingsFormFromState();
 
-await dbInit();
-try {
-    const fromDb = await dbGetPendingOut();
-    if (fromDb && fromDb.length) {
-        pendingOutgoing = fromDb;
-    } else {
-        pendingOutgoing = JSON.parse(localStorage.getItem('orbit_pending_out') || '[]');
-        if (pendingOutgoing.length) await dbSetPendingOut(pendingOutgoing);
+async function initApp() {
+    console.log('[Init] Starting app initialization...');
+    try {
+        await dbInit();
+        console.log('[Init] dbInit successful.');
+        
+        try {
+            await cryptoDerive('test', 'test');
+            console.log('[Init] Crypto worker ping successful.');
+        } catch (err) {
+            console.error('[Init] Crypto worker not responding:', err);
+        }
+
+        try {
+            const fromDb = await dbGetPendingOut();
+            if (fromDb && fromDb.length) {
+                pendingOutgoing = fromDb;
+            } else {
+                pendingOutgoing = JSON.parse(localStorage.getItem('orbit_pending_out') || '[]');
+                if (pendingOutgoing.length) await dbSetPendingOut(pendingOutgoing);
+            }
+        } catch {
+            pendingOutgoing = JSON.parse(localStorage.getItem('orbit_pending_out') || '[]');
+        }
+    } catch (err) {
+        console.error("DB Init error", err);
+        alert("Ошибка инициализации базы данных. Возможно, вы используете приватный режим, или IndexedDB заблокирован: " + err.message);
     }
-} catch {
-    pendingOutgoing = JSON.parse(localStorage.getItem('orbit_pending_out') || '[]');
 }
+
+initApp();
+
 initLongTaskObserver((e) => {
     if (import.meta.env?.DEV) console.warn('[longtask]', e.duration, e);
 });
@@ -637,24 +657,30 @@ if (typeof navigator !== 'undefined' && navigator.deviceMemory && navigator.devi
 }
 
 async function verifyAndUnlockVault(nick, password) {
-    const verifierKey = `orbit_vault_verifier_${nick}`;
-    const passHash = await cryptoSha256Hex(`${nick}:${password}:orbits`);
-    const existingVerifier = localStorage.getItem(verifierKey);
-    if (!existingVerifier) {
-        localStorage.setItem(verifierKey, passHash);
-    } else if (existingVerifier !== passHash) {
-        if (appSettings.duressPasswordHash && appSettings.duressPasswordHash === passHash) {
-            friends = [];
-            localStorage.setItem('orbit_friends', '[]');
-            await cryptoDerive(password, nick);
-            vaultLocked = false;
-            return true;
+    try {
+        const verifierKey = `orbit_vault_verifier_${nick}`;
+        const passHash = await cryptoSha256Hex(`${nick}:${password}:orbits`);
+        const existingVerifier = localStorage.getItem(verifierKey);
+        if (!existingVerifier) {
+            localStorage.setItem(verifierKey, passHash);
+        } else if (existingVerifier !== passHash) {
+            if (appSettings.duressPasswordHash && appSettings.duressPasswordHash === passHash) {
+                console.warn('[Vault] Duress password triggered');
+                friends = [];
+                localStorage.setItem('orbit_friends', '[]');
+                await cryptoDerive(password, nick);
+                vaultLocked = false;
+                return true;
+            }
+            return false;
         }
-        return false;
+        await cryptoDerive(password, nick);
+        vaultLocked = false;
+        return true;
+    } catch (err) {
+        console.error('[Vault] Error verifying and unlocking vault:', err);
+        throw err;
     }
-    await cryptoDerive(password, nick);
-    vaultLocked = false;
-    return true;
 }
 
 async function lockVault() {
@@ -665,7 +691,7 @@ async function lockVault() {
     setSendAvailability();
 }
 
-loginBtn.onclick = async () => {
+function loginHandler() {
     if (!privacyConsent.checked) {
         alert('Сначала примите Политику конфиденциальности.');
         return;
@@ -674,28 +700,62 @@ loginBtn.onclick = async () => {
     const pass = passwordInput.value.trim();
     if (nick.length < 3) return alert('Ник должен быть минимум 3 символа (буквы, цифры, _)');
     if (pass.length < 6) return alert('Мастер-пароль минимум 6 символов.');
-    const unlocked = await verifyAndUnlockVault(nick, pass);
-    if (!unlocked) return alert('Неверный мастер-пароль.');
-    localStorage.setItem('orbits_policy_accepted', 'true');
-    localStorage.setItem('orbit_nickname', nick);
-    startOrbit(nick);
-};
+    
+    console.log('[Login] Privacy consent:', privacyConsent.checked);
+    console.log('[Login] Raw nickname:', nicknameInput.value);
+    console.log('[Login] Sanitized nickname:', nick);
+    console.log('[Login] Password length:', pass.length);
+    console.log('[Login] Starting vault verification...');
+    
+    const originalText = loginBtn.textContent;
+    loginBtn.textContent = 'Connecting...';
+    loginBtn.disabled = true;
+
+    verifyAndUnlockVault(nick, pass).then(unlocked => {
+        console.log('[Login] Vault unlocked:', unlocked);
+        if (!unlocked) {
+            loginBtn.textContent = originalText;
+            loginBtn.disabled = false;
+            return alert('Неверный мастер-пароль.');
+        }
+        localStorage.setItem('orbits_policy_accepted', 'true');
+        localStorage.setItem('orbit_nickname', nick);
+        console.log('[Login] Starting Orbit...');
+        startOrbit(nick);
+        console.log('[Login] Success!');
+        loginBtn.textContent = originalText;
+        loginBtn.disabled = false;
+    }).catch(err => {
+        console.error("[Login] Fatal error:", err);
+        loginBtn.textContent = originalText;
+        loginBtn.disabled = false;
+        alert('Ошибка входа: ' + err.message + '\n\nВозможно, вы используете HTTP вместо HTTPS (Crypto API недоступен).');
+    });
+}
+
+if (loginBtn) {
+    loginBtn.onclick = loginHandler;
+}
 
 unlockVaultBtn.onclick = async () => {
     const pass = unlockPasswordInput.value.trim();
     if (!pass || !myNickname) return;
-    const unlocked = await verifyAndUnlockVault(myNickname, pass);
-    if (!unlocked) return alert('Неверный мастер-пароль.');
-    vaultLockModal.style.display = 'none';
-    vaultLockModal.setAttribute('aria-hidden', 'true');
-    unlockPasswordInput.value = '';
-    vaultLocked = false;
-    setSendAvailability();
-    if (currentChatFriend) {
-        void loadInitialMessagesForChat().then(() => {
-            msgsVirtual?.refresh();
-            msgsVirtual?.scrollToBottom();
-        });
+    try {
+        const unlocked = await verifyAndUnlockVault(myNickname, pass);
+        if (!unlocked) return alert('Неверный мастер-пароль.');
+        vaultLockModal.style.display = 'none';
+        vaultLockModal.setAttribute('aria-hidden', 'true');
+        unlockPasswordInput.value = '';
+        vaultLocked = false;
+        setSendAvailability();
+        if (currentChatFriend) {
+            void loadInitialMessagesForChat().then(() => {
+                msgsVirtual?.refresh();
+                msgsVirtual?.scrollToBottom();
+            });
+        }
+    } catch (err) {
+        alert('Ошибка разблокировки: ' + err.message);
     }
 };
 
@@ -747,7 +807,18 @@ function startOrbit(nick) {
         }
     });
 
+    let connectionTimeout = setTimeout(() => {
+        if (!peer || !peer.open) {
+            console.error('[PeerJS] Connection timeout');
+            alert('Connection timeout. Please check your internet and try again.');
+            loginPanel.style.display = 'block';
+            appContainer.style.display = 'none';
+        }
+    }, 10000);
+
     peer.on('open', (id) => {
+        clearTimeout(connectionTimeout);
+        console.log('[PeerJS] Connected with ID:', id);
         document.getElementById('my-status').style.color = 'var(--success)';
         document.getElementById('my-status').textContent = 'В сети';
         renderFriends();
@@ -764,17 +835,38 @@ function startOrbit(nick) {
     });
 
     peer.on('error', (err) => {
-        if(err.type === 'unavailable-id') {
-            alert('Этот позывной уже используется в данный момент! Выбери другой.');
-            localStorage.removeItem('orbit_nickname');
-            location.reload();
-        } else if (err.type === 'peer-unavailable') {
-            if (pendingFriendAdd) {
-                alert(`Пользователь "${pendingFriendAdd}" не найден или не в сети! (Сначала нужно войти в сеть)`);
-                addFriendBtn.disabled = false;
-                addFriendBtn.textContent = '+';
-                pendingFriendAdd = null;
-            }
+        console.error('[PeerJS] Error:', err);
+        let message = 'Connection error: ';
+        
+        switch (err.type) {
+            case 'unavailable-id':
+                message = 'Этот позывной уже используется в данный момент! Выбери другой.';
+                localStorage.removeItem('orbit_nickname');
+                setTimeout(() => location.reload(), 2000);
+                break;
+            case 'network':
+                message = 'Cannot connect to network. Check your internet connection.';
+                break;
+            case 'peer-unavailable':
+                message = 'Cannot connect to the signaling server (peer unavailable).';
+                if (pendingFriendAdd) {
+                    alert(`Пользователь "${pendingFriendAdd}" не найден или не в сети!`);
+                    addFriendBtn.disabled = false;
+                    addFriendBtn.textContent = '+';
+                    pendingFriendAdd = null;
+                    return;
+                }
+                break;
+            default:
+                message = err.message || 'Unknown error';
+        }
+        
+        alert(message);
+        
+        // Reset UI if we are failing to connect initially
+        if (!peer.open && !pendingFriendAdd) {
+            loginPanel.style.display = 'block';
+            appContainer.style.display = 'none';
         }
     });
 
