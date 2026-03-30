@@ -215,7 +215,7 @@
     <!-- JS Injects UI Here based on OS -->
     <div id="main-download-area">
       <div class="loading-spinner"></div>
-      <p style="color: var(--text-muted); font-size: 14px;">Определение платформы...</p>
+      <p style="color: var(--text-muted); font-size: 14px;">Detecting platform...</p>
     </div>
 
     <!-- Other platforms -->
@@ -323,7 +323,7 @@
 
       if (currentOSID === 'ios' && currentOS.type === 'webapp') {
          // Modify button nicely
-         document.getElementById('main-action-btn').href = '/index.html'; // Or absolute URL if hosted
+         document.getElementById('main-action-btn').href = './index.html'; // Keep repo-relative path for GitHub Pages
       }
     }
 
@@ -339,7 +339,7 @@
         // Link resolution
         let link = '#';
         if (p.type === 'webapp') {
-          link = '/index.html';
+          link = './index.html';
         } else if (linksData[key]) {
           link = linksData[key].url;
         }
@@ -384,7 +384,7 @@
            mainLink = links[currentOSID].url || '#';
            mainHash = links[currentOSID].hash || null;
         } else if (currentOS.type === 'webapp') {
-           mainLink = '/index.html';
+           mainLink = './index.html';
         }
 
         renderMainArea(mainLink, mainHash);
@@ -394,7 +394,7 @@
         console.error("Failed to load GitHub release data:", err);
         // Fallback layout in case of API limit or fetch error
         renderMainArea('#', null);
-        document.querySelector('#main-download-area .install-instructions').insertAdjacentHTML('afterbegin', '<p style="color:#ff4545;margin-bottom:10px;">⚠️ Не удалось получить ссылку (возможно нет билда или проблема с API).</p>');
+        document.querySelector('#main-download-area .install-instructions').insertAdjacentHTML('afterbegin', '<p style="color:#ff4545;margin-bottom:10px;">⚠️ Failed to fetch release links (missing build or GitHub API limit).</p>');
         renderOtherPlatforms({windows:{url:'#'}, android:{url:'#'}, mac:{url:'#'}});
       }
     }
