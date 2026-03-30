@@ -1,12 +1,12 @@
 import Peer from 'peerjs';
 
 // i18n Localization
-const userLang = navigator.language.startsWith('ru') ? 'ru' : 'en';
+const userLang = localStorage.getItem('orbit_lang') || 'en';
 const i18n = {
     en: { accept: "Accept", decline: "Decline", incoming: "Incoming call", caller: "is calling...", camError: "No access to camera or mic. Starting audio call.", camFallback: "Unable to access camera. Audio call started.", mediaError: "Access denied. Ensure mic/camera permissions are granted.", endCall: "End Call", callingError: "User must be 'Online' to call!" },
     ru: { accept: "Принять", decline: "Отклонить", incoming: "Входящий вызов", caller: "вызывает...", camError: "Нет доступа к камере или микрофону. Включен аудио-звонок.", camFallback: "Не удалось получить доступ к камере. Включен голосовой вызов.", mediaError: "Действие отклонено. Убедитесь, что выдали права на микрофон и камеру.", endCall: "Завершить звонок", callingError: "Пользователь должен быть 'В сети' для звонка!" }
 };
-const t = i18n[userLang];
+const t = i18n[userLang] || i18n.en;
 // System Notification Setup
 if (window.Notification && Notification.permission !== "granted" && Notification.permission !== "denied") {
     Notification.requestPermission();
@@ -28,6 +28,9 @@ const appContainer = document.getElementById('app-container');
 const myIdDisplay = document.getElementById('my-id-display');
 const myAvatarLetter = document.getElementById('my-avatar-letter');
 const friendsListContainer = document.getElementById('friends-list');
+const chatsTitle = document.querySelector('.chats-title');
+const addFriendBox = document.querySelector('.add-friend-box');
+const contactsEmptyState = document.getElementById('contacts-empty-state');
 const addFriendInput = document.getElementById('add-friend-input');
 const addFriendBtn = document.getElementById('add-friend-btn');
 
@@ -47,6 +50,8 @@ const ttlSelect = document.getElementById('ttl-select');
 const backBtn = document.getElementById('back-btn');
 const openSettingsBtn = document.getElementById('open-settings-btn');
 const openSettingsFab = document.getElementById('open-settings-fab');
+const bottomChatsBtn = document.getElementById('bottom-chats-btn');
+const bottomContactsBtn = document.getElementById('bottom-contacts-btn');
 const bottomSettingsBtn = document.getElementById('bottom-settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
@@ -62,8 +67,10 @@ const ringtoneToggle = document.getElementById('ringtone-toggle');
 const autoQualityToggle = document.getElementById('auto-quality-toggle');
 const videoQualitySelect = document.getElementById('video-quality-select');
 const typingIndicatorToggle = document.getElementById('typing-indicator-toggle');
+const starsBgToggle = document.getElementById('stars-bg-toggle');
 const themeSelect = document.getElementById('theme-select');
 const bubbleStyleSelect = document.getElementById('bubble-style-select');
+const chatDensitySelect = document.getElementById('chat-density-select');
 const runNetworkTestBtn = document.getElementById('run-network-test-btn');
 const networkTestResult = document.getElementById('network-test-result');
 const mailboxUrlInput = document.getElementById('mailbox-url-input');
@@ -128,6 +135,36 @@ function fromBase64(b64) {
     return bytes;
 }
 
+async function normalizeAvatar(file) {
+    if (!file || !file.type?.startsWith('image/')) return '';
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const maxSide = 320;
+                const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+                const w = Math.max(1, Math.round(img.width * scale));
+                const h = Math.max(1, Math.round(img.height * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(reader.result || '');
+                    return;
+                }
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.82));
+            };
+            img.onerror = () => resolve(reader.result || '');
+            img.src = String(reader.result || '');
+        };
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
+    });
+}
+
 async function sha256Hex(str) {
     const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(str));
     return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -174,6 +211,18 @@ async function decryptFromVault(enc) {
 // --- IndexedDB Setup ---
 const dbName = 'OrbitsDB';
 let db;
+
+function safeJsonParse(raw, fallback) {
+    try {
+        return JSON.parse(raw);
+    } catch (_) {
+        return fallback;
+    }
+}
+
+function getUserSettingsKey(nick) {
+    return `orbit_settings_${nick}`;
+}
 
 const initDB = () => {
     return new Promise((resolve, reject) => {
@@ -294,8 +343,9 @@ const clearAllMessagesDB = () => {
 // State
 let peer = null;
 let myNickname = '';
-let friends = JSON.parse(localStorage.getItem('orbit_friends') || '[]');
+let friends = safeJsonParse(localStorage.getItem('orbit_friends') || '[]', []);
 let activeConnections = {}; 
+let connectingPeers = new Set();
 let activeCall = null;
 let localStream = null;
 let currentChatFriend = null; 
@@ -316,6 +366,7 @@ const incomingTransfers = new Map();
 let outgoingRingToneHandle = null;
 let incomingRingToneHandle = null;
 let mailboxPollTimer = null;
+const CALL_RING_TIMEOUT_MS = 35000;
 
 const defaultSettings = {
     displayName: '',
@@ -330,21 +381,43 @@ const defaultSettings = {
     mailboxUrl: '',
     mailboxAnonKey: '',
     typingIndicator: true,
+    starsBackground: true,
     theme: 'space',
     bubbleStyle: 'glass',
+    chatDensity: 'comfortable',
     duressPasswordHash: '',
     allowScreenshots: false
 };
 
 let appSettings = {
     ...defaultSettings,
-    ...(JSON.parse(localStorage.getItem('orbit_settings') || '{}'))
+    ...(safeJsonParse(localStorage.getItem('orbit_settings') || '{}', {}))
 };
 
-let trustState = JSON.parse(localStorage.getItem('orbit_trust') || '{}');
-let blockedPeers = JSON.parse(localStorage.getItem('orbit_blocked_peers') || '[]');
-let reportLog = JSON.parse(localStorage.getItem('orbit_report_log') || '[]');
-let peerProfiles = JSON.parse(localStorage.getItem('orbit_peer_profiles') || '{}');
+let trustState = safeJsonParse(localStorage.getItem('orbit_trust') || '{}', {});
+let blockedPeers = safeJsonParse(localStorage.getItem('orbit_blocked_peers') || '[]', []);
+let reportLog = safeJsonParse(localStorage.getItem('orbit_report_log') || '[]', []);
+let peerProfiles = safeJsonParse(localStorage.getItem('orbit_peer_profiles') || '{}', {});
+let sidebarTab = 'chats';
+
+const peerIceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    {
+        urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'],
+        username: 'peerjs',
+        credential: 'peerjsp'
+    }
+];
+
+function createPeerInstance(id) {
+    return new Peer(id, {
+        host: '0.peerjs.com',
+        port: 443,
+        path: '/',
+        secure: true,
+        config: { iceServers: peerIceServers }
+    });
+}
 
 // Initialization
 const policyAccepted = localStorage.getItem('orbits_policy_accepted') === 'true';
@@ -407,6 +480,12 @@ if (bottomSettingsBtn) {
         await populateMicDevices();
     };
 }
+if (bottomChatsBtn) {
+    bottomChatsBtn.onclick = () => setSidebarTab('chats');
+}
+if (bottomContactsBtn) {
+    bottomContactsBtn.onclick = () => setSidebarTab('contacts');
+}
 if (closeSettingsBtn) {
     closeSettingsBtn.onclick = () => {
         settingsModal.style.display = 'none';
@@ -441,7 +520,7 @@ if (saveSettingsBtn) {
         const duressRaw = duressPasswordInput.value.trim();
         if (duressRaw.length > 0) {
             if (duressRaw.length < 6) {
-                alert('Лже-пароль минимум 6 символов.');
+                alert('Duress password must be at least 6 characters.');
                 return;
             }
             appSettings.duressPasswordHash = await sha256Hex(`${myNickname}:${duressRaw}:orbits`);
@@ -459,15 +538,16 @@ if (saveSettingsBtn) {
     };
 }
 if (settingsAvatarInput) {
-    settingsAvatarInput.onchange = (e) => {
+    settingsAvatarInput.onchange = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            appSettings.avatarData = ev.target?.result || '';
-            settingsAvatarPreview.src = appSettings.avatarData;
-        };
-        reader.readAsDataURL(file);
+        const avatarData = await normalizeAvatar(file);
+        if (!avatarData) return;
+        appSettings.avatarData = avatarData;
+        settingsAvatarPreview.src = appSettings.avatarData;
+        saveSettings();
+        applyProfileToUI();
+        broadcastMyProfile();
     };
 }
 
@@ -490,7 +570,7 @@ if (submitReportBtn) {
         const now = Date.now();
         reportLog = reportLog.filter(ts => now - ts < 60 * 60 * 1000);
         if (reportLog.length >= 3) {
-            alert('Лимит жалоб: не более 3 в час.');
+            alert('Report limit reached: max 3 per hour.');
             return;
         }
         reportLog.push(now);
@@ -509,12 +589,12 @@ if (submitReportBtn) {
         updateTrustBadge(currentChatFriend);
         reportModal.style.display = 'none';
         reportModal.setAttribute('aria-hidden', 'true');
-        alert('Жалоба отправлена. Пользователь заблокирован локально.');
+        alert('Report submitted. User blocked locally.');
     };
 }
 if (panicWipeBtn) {
     panicWipeBtn.onclick = async () => {
-        const ok = confirm('Это удалит все локальные данные Orbits на этом устройстве. Продолжить?');
+        const ok = confirm('This will delete all local Orbits data on this device. Continue?');
         if (!ok) return;
         await clearAllMessagesDB();
         localStorage.clear();
@@ -565,15 +645,16 @@ function lockVault() {
 
 loginBtn.onclick = async () => {
     if (!privacyConsent.checked) {
-        alert('Сначала примите Политику конфиденциальности.');
+        alert('Please accept the Privacy Policy first.');
         return;
     }
     const nick = nicknameInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '');
     const pass = passwordInput.value.trim();
-    if (nick.length < 3) return alert('Ник должен быть минимум 3 символа (буквы, цифры, _)');
-    if (pass.length < 6) return alert('Мастер-пароль минимум 6 символов.');
+    if (nick.length < 3) return alert('Nickname must be at least 3 characters (letters, numbers, _)');
+    if (pass.length < 6) return alert('Master password must be at least 6 characters.');
+    loadSettingsForNickname(nick);
     const unlocked = await verifyAndUnlockVault(nick, pass);
-    if (!unlocked) return alert('Неверный мастер-пароль.');
+    if (!unlocked) return alert('Invalid master password.');
     localStorage.setItem('orbits_policy_accepted', 'true');
     localStorage.setItem('orbit_nickname', nick);
     startOrbit(nick);
@@ -582,8 +663,9 @@ loginBtn.onclick = async () => {
 unlockVaultBtn.onclick = async () => {
     const pass = unlockPasswordInput.value.trim();
     if (!pass || !myNickname) return;
+    loadSettingsForNickname(myNickname);
     const unlocked = await verifyAndUnlockVault(myNickname, pass);
-    if (!unlocked) return alert('Неверный мастер-пароль.');
+    if (!unlocked) return alert('Invalid master password.');
     vaultLockModal.style.display = 'none';
     vaultLockModal.setAttribute('aria-hidden', 'true');
     unlockPasswordInput.value = '';
@@ -594,6 +676,9 @@ unlockVaultBtn.onclick = async () => {
 
 function startOrbit(nick) {
     myNickname = nick;
+    loadSettingsForNickname(nick);
+    syncSettingsFormFromState();
+    applyThemeSettings();
     if (!localStorage.getItem('orbit_profile_created_at')) {
         localStorage.setItem('orbit_profile_created_at', String(Date.now()));
     }
@@ -608,18 +693,33 @@ function startOrbit(nick) {
     peerProfiles[myNickname] = { displayName: getActiveDisplayName(), avatarData: appSettings.avatarData || '' };
     persistPeerProfiles();
 
-    // Создаем ключ
-    peer = new Peer(myNickname);
+    // Create peer client with explicit cloud settings.
+    peer = createPeerInstance(myNickname);
     
     peer.on('open', (id) => {
         document.getElementById('my-status').style.color = 'var(--success)';
-        document.getElementById('my-status').textContent = 'В сети';
+        document.getElementById('my-status').textContent = 'Online';
         renderFriends();
+        setSidebarTab(sidebarTab);
         connectToAllFriends();
         applyNetworkState();
         broadcastMyProfile();
+        upsertPeerRegistry(myNickname);
         pollMailboxAndDeliver();
         startMailboxPolling();
+    });
+
+    peer.on('disconnected', () => {
+        document.getElementById('my-status').style.color = 'var(--text-muted)';
+        document.getElementById('my-status').textContent = 'Reconnecting...';
+        try {
+            peer.reconnect();
+        } catch (_) {}
+    });
+
+    peer.on('close', () => {
+        document.getElementById('my-status').style.color = 'var(--text-muted)';
+        document.getElementById('my-status').textContent = 'Offline';
     });
 
     peer.on('connection', (conn) => {
@@ -632,16 +732,18 @@ function startOrbit(nick) {
 
     peer.on('error', (err) => {
         if(err.type === 'unavailable-id') {
-            alert('Этот позывной уже используется в данный момент! Выбери другой.');
+            alert('This nickname is already in use right now. Pick another one.');
             localStorage.removeItem('orbit_nickname');
             location.reload();
-        } else if (err.type === 'peer-unavailable') {
-            if (pendingFriendAdd) {
-                alert(`Пользователь "${pendingFriendAdd}" не найден или не в сети! (Сначала нужно войти в сеть)`);
-                addFriendBtn.disabled = false;
-                addFriendBtn.textContent = '+';
-                pendingFriendAdd = null;
-            }
+        } else if (err.type === 'network' || err.type === 'socket-error' || err.type === 'socket-closed') {
+            document.getElementById('my-status').style.color = 'var(--text-muted)';
+            document.getElementById('my-status').textContent = 'Reconnecting...';
+            setTimeout(() => {
+                try {
+                    if (peer && !peer.disconnected) return;
+                    peer?.reconnect?.();
+                } catch (_) {}
+            }, 1200);
         }
     });
 
@@ -659,15 +761,15 @@ function setSendAvailability() {
     fileBtn.disabled = blocked;
     sendVoiceBtn.disabled = blocked;
     if (isOffline) {
-        chatInput.placeholder = 'Ожидание сети... отправка временно недоступна';
+        chatInput.placeholder = 'Waiting for network... sending is temporarily unavailable';
         sendVoiceBtn.style.opacity = '0.5';
         fileBtn.style.opacity = '0.5';
     } else if (vaultLocked) {
-        chatInput.placeholder = 'Сессия заблокирована. Разблокируйте кабинет';
+        chatInput.placeholder = 'Session is locked. Unlock the vault';
         sendVoiceBtn.style.opacity = '0.5';
         fileBtn.style.opacity = '0.5';
     } else {
-        chatInput.placeholder = 'Написать сообщение...';
+        chatInput.placeholder = 'Type a message...';
         sendVoiceBtn.style.opacity = '1';
         fileBtn.style.opacity = '1';
     }
@@ -678,14 +780,26 @@ function applyNetworkState() {
     if (currentChatFriend) {
         const statusEl = document.getElementById('chat-friend-status');
         if (isOffline) {
-            statusEl.textContent = 'ожидание сети...';
+            statusEl.textContent = 'waiting for network...';
             statusEl.style.color = 'var(--text-muted)';
         } else {
             const conn = activeConnections[currentChatFriend];
-            statusEl.textContent = (conn && conn.open) ? 'в сети' : 'не в сети';
+            statusEl.textContent = (conn && conn.open) ? 'online' : 'offline';
             statusEl.style.color = (conn && conn.open) ? 'var(--success)' : 'var(--text-muted)';
         }
     }
+}
+
+function setSidebarTab(nextTab) {
+    sidebarTab = nextTab === 'contacts' ? 'contacts' : 'chats';
+    if (!friendsListContainer || !contactsEmptyState || !addFriendBox || !chatsTitle) return;
+    const isChats = sidebarTab === 'chats';
+    addFriendBox.style.display = isChats ? 'flex' : 'none';
+    chatsTitle.style.display = isChats ? 'block' : 'none';
+    friendsListContainer.style.display = isChats ? 'block' : 'none';
+    contactsEmptyState.style.display = isChats ? 'none' : 'block';
+    if (bottomChatsBtn) bottomChatsBtn.classList.toggle('active', isChats);
+    if (bottomContactsBtn) bottomContactsBtn.classList.toggle('active', !isChats);
 }
 
 async function flushOutgoingQueue() {
@@ -779,6 +893,48 @@ async function pollMailboxAndDeliver() {
     }
 }
 
+async function upsertPeerRegistry(nickname) {
+    const cfg = getMailboxConfig();
+    if (!cfg.url || !cfg.key || !nickname) return;
+    try {
+        await fetch(`${cfg.url}/rest/v1/peer_registry`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': cfg.key,
+                'Authorization': `Bearer ${cfg.key}`,
+                'Prefer': 'resolution=merge-duplicates,return=minimal'
+            },
+            body: JSON.stringify([{
+                nickname,
+                peer_id: nickname,
+                updated_at: new Date().toISOString()
+            }])
+        });
+    } catch (_) {
+        // silent registry errors
+    }
+}
+
+async function resolvePeerByNickname(nickname) {
+    const cfg = getMailboxConfig();
+    if (!cfg.url || !cfg.key || !nickname) return null;
+    try {
+        const endpoint = `${cfg.url}/rest/v1/peer_registry?nickname=eq.${encodeURIComponent(nickname)}&select=peer_id&limit=1`;
+        const res = await fetch(endpoint, {
+            headers: {
+                'apikey': cfg.key,
+                'Authorization': `Bearer ${cfg.key}`
+            }
+        });
+        if (!res.ok) return null;
+        const rows = await res.json();
+        return rows?.[0]?.peer_id || null;
+    } catch (_) {
+        return null;
+    }
+}
+
 function startMailboxPolling() {
     if (mailboxPollTimer) clearInterval(mailboxPollTimer);
     mailboxPollTimer = setInterval(() => {
@@ -814,9 +970,9 @@ function calculateTrustScore(peerId) {
 
 function getTrustBadgeData(peerId) {
     const score = calculateTrustScore(peerId);
-    if (score >= 70) return { text: 'Щит: зелёный', className: 'trust-safe' };
-    if (score >= 40) return { text: 'Щит: жёлтый', className: 'trust-warn' };
-    return { text: 'Щит: красный', className: 'trust-risk' };
+    if (score >= 70) return { text: 'Shield: Green', className: 'trust-safe' };
+    if (score >= 40) return { text: 'Shield: Yellow', className: 'trust-warn' };
+    return { text: 'Shield: Red', className: 'trust-risk' };
 }
 
 function updateTrustBadge(peerId) {
@@ -831,7 +987,7 @@ function maybeShowNewUserWarning(peerId) {
     const isNew = Date.now() - entry.firstSeenAt < 24 * 60 * 60 * 1000;
     if (isNew) {
         chatWarningBanner.style.display = 'block';
-        chatWarningBanner.textContent = 'Внимание: новый пользователь. Будьте осторожны при передаче файлов.';
+        chatWarningBanner.textContent = 'Warning: new user. Be careful when sharing files.';
     } else {
         chatWarningBanner.style.display = 'none';
     }
@@ -852,6 +1008,19 @@ function blockPeer(peerId) {
 
 function saveSettings() {
     localStorage.setItem('orbit_settings', JSON.stringify(appSettings));
+    if (myNickname) {
+        localStorage.setItem(getUserSettingsKey(myNickname), JSON.stringify(appSettings));
+    }
+}
+
+function loadSettingsForNickname(nick) {
+    const globalSettings = safeJsonParse(localStorage.getItem('orbit_settings') || '{}', {});
+    const userSettings = safeJsonParse(localStorage.getItem(getUserSettingsKey(nick)) || '{}', {});
+    appSettings = {
+        ...defaultSettings,
+        ...globalSettings,
+        ...userSettings
+    };
 }
 
 function getActiveDisplayName() {
@@ -868,7 +1037,7 @@ function persistPeerProfiles() {
 }
 
 function applyProfileToUI() {
-    myIdDisplay.textContent = getActiveDisplayName() || 'Пользователь';
+    myIdDisplay.textContent = getActiveDisplayName() || 'User';
     myAvatarLetter.textContent = (getActiveDisplayName() || 'U').substring(0, 2).toUpperCase();
     if (appSettings.avatarData) {
         myAvatarImage.src = appSettings.avatarData;
@@ -880,10 +1049,26 @@ function applyProfileToUI() {
 }
 
 function applyThemeSettings() {
-    document.body.classList.remove('theme-aurora', 'theme-deep', 'bubble-flat');
+    document.body.classList.remove(
+        'theme-aurora',
+        'theme-deep',
+        'theme-neon',
+        'theme-sunset',
+        'bubble-flat',
+        'bubble-rounded',
+        'bubble-compact',
+        'density-compact',
+        'stars-off'
+    );
     if (appSettings.theme === 'aurora') document.body.classList.add('theme-aurora');
     if (appSettings.theme === 'deep') document.body.classList.add('theme-deep');
+    if (appSettings.theme === 'neon') document.body.classList.add('theme-neon');
+    if (appSettings.theme === 'sunset') document.body.classList.add('theme-sunset');
     if (appSettings.bubbleStyle === 'flat') document.body.classList.add('bubble-flat');
+    if (appSettings.bubbleStyle === 'rounded') document.body.classList.add('bubble-rounded');
+    if (appSettings.bubbleStyle === 'compact') document.body.classList.add('bubble-compact');
+    if (appSettings.chatDensity === 'compact') document.body.classList.add('density-compact');
+    if (appSettings.starsBackground === false) document.body.classList.add('stars-off');
 }
 
 function broadcastMyProfile() {
@@ -1000,8 +1185,10 @@ function syncSettingsFormFromState() {
     mailboxUrlInput.value = appSettings.mailboxUrl || '';
     mailboxKeyInput.value = appSettings.mailboxAnonKey || '';
     typingIndicatorToggle.checked = !!appSettings.typingIndicator;
+    starsBgToggle.checked = appSettings.starsBackground !== false;
     themeSelect.value = appSettings.theme || 'space';
     bubbleStyleSelect.value = appSettings.bubbleStyle || 'glass';
+    chatDensitySelect.value = appSettings.chatDensity || 'comfortable';
     duressPasswordInput.value = '';
     allowScreenshotsToggle.checked = !!appSettings.allowScreenshots;
     videoQualitySelect.disabled = !!appSettings.autoQuality;
@@ -1019,8 +1206,10 @@ function readSettingsFormToState() {
     appSettings.mailboxUrl = mailboxUrlInput.value.trim();
     appSettings.mailboxAnonKey = mailboxKeyInput.value.trim();
     appSettings.typingIndicator = typingIndicatorToggle.checked;
+    appSettings.starsBackground = starsBgToggle.checked;
     appSettings.theme = themeSelect.value;
     appSettings.bubbleStyle = bubbleStyleSelect.value;
+    appSettings.chatDensity = chatDensitySelect.value;
     appSettings.allowScreenshots = allowScreenshotsToggle.checked;
 }
 
@@ -1053,14 +1242,14 @@ async function runNetworkTest() {
         videoQualitySelect.value = recommended;
         saveSettings();
     }
-    networkTestResult.textContent = `Тест: RTT ~ ${metrics.rtt}ms, downlink ~ ${metrics.downlink || 'n/a'}Mbps, type ${metrics.effectiveType}. Рекомендовано: ${recommended.toUpperCase()}.`;
+    networkTestResult.textContent = `Test: RTT ~ ${metrics.rtt}ms, downlink ~ ${metrics.downlink || 'n/a'}Mbps, type ${metrics.effectiveType}. Recommended: ${recommended.toUpperCase()}.`;
     await applyVideoQualityToLiveCall(appSettings.videoQuality);
 }
 
 function updateCallStatusByRtt(peerId, rtt) {
     if (!activeCall || activeCall.peer !== peerId) return;
     if (rtt > 800) {
-        callStatus.textContent = 'Слабый сигнал сети';
+        callStatus.textContent = 'Weak network signal';
         if (appSettings.autoQuality) {
             appSettings.videoQuality = 'low';
             videoQualitySelect.value = 'low';
@@ -1068,7 +1257,7 @@ function updateCallStatusByRtt(peerId, rtt) {
             applyVideoQualityToLiveCall('low');
         }
     } else if (rtt > 500) {
-        callStatus.textContent = 'Слабый сигнал сети';
+        callStatus.textContent = 'Weak network signal';
         if (appSettings.autoQuality) {
             appSettings.videoQuality = 'medium';
             videoQualitySelect.value = 'medium';
@@ -1076,7 +1265,7 @@ function updateCallStatusByRtt(peerId, rtt) {
             applyVideoQualityToLiveCall('medium');
         }
     } else {
-        callStatus.textContent = 'В звонке';
+        callStatus.textContent = 'In call';
     }
 }
 
@@ -1084,13 +1273,13 @@ async function populateMicDevices() {
     try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const current = appSettings.micDeviceId || '';
-        micDeviceSelect.innerHTML = '<option value="">По умолчанию</option>';
+        micDeviceSelect.innerHTML = '<option value="">Default</option>';
         devices
             .filter(d => d.kind === 'audioinput')
             .forEach((d, idx) => {
                 const opt = document.createElement('option');
                 opt.value = d.deviceId;
-                opt.textContent = d.label || `Микрофон ${idx + 1}`;
+                opt.textContent = d.label || `Microphone ${idx + 1}`;
                 micDeviceSelect.appendChild(opt);
             });
         micDeviceSelect.value = current;
@@ -1133,7 +1322,7 @@ async function startMicTest() {
         };
         draw();
     } catch (e) {
-        alert('Не удалось запустить тест микрофона. Проверьте разрешения.');
+        alert('Unable to start microphone test. Check permissions.');
     }
 }
 
@@ -1182,7 +1371,7 @@ function connectToAllFriends() {
                     conn.close();
                     delete activeConnections[f.id];
                     if (currentChatFriend === f.id) {
-                        document.getElementById('chat-friend-status').textContent = 'не в сети';
+                        document.getElementById('chat-friend-status').textContent = 'offline';
                         document.getElementById('chat-friend-status').style.color = 'var(--text-muted)';
                     }
                     renderFriends();
@@ -1196,49 +1385,39 @@ function connectToAllFriends() {
 
 function tryConnect(friendId) {
     if (activeConnections[friendId] && activeConnections[friendId].open) return;
+    if (connectingPeers.has(friendId)) return;
+    connectingPeers.add(friendId);
     const conn = peer.connect(friendId, { reliable: true });
     handleIncomingConnection(conn);
 }
 
-let pendingFriendAdd = null;
-
-function addFriend(id) {
+async function addFriend(id) {
     id = id.trim();
     if (!id || id === myNickname) return;
-    if (blockedPeers.includes(id)) return alert('Этот пользователь у вас в блоке.');
-    if (friends.find(f => f.id === id)) return alert('Уже в друзьях!');
-    
+    if (blockedPeers.includes(id)) return alert('This user is blocked locally.');
+    if (friends.find(f => f.id === id)) return alert('Already in friends.');
+
+    const resolvedId = (await resolvePeerByNickname(id)) || id;
     addFriendBtn.disabled = true;
     addFriendBtn.textContent = '...';
-    pendingFriendAdd = id;
-    
-    const conn = peer.connect(id, { reliable: true });
-    
-    let isHandled = false;
-    conn.on('open', () => {
-        if (isHandled) return;
-        isHandled = true;
-        
-        friends.push({ id, name: id });
-        ensurePeerTrust(id);
-        persistTrustState();
-        localStorage.setItem('orbit_friends', JSON.stringify(friends));
-        activeConnections[id] = conn;
-        renderFriends();
-        
-        conn.on('data', (data) => receiveMessage(conn.peer, data));
-        
-        addFriendBtn.disabled = false;
-        addFriendBtn.textContent = '+';
-        pendingFriendAdd = null;
-        alert('Успешно добавлен!');
-    });
+
+    friends.push({ id: resolvedId, name: resolvedId });
+    ensurePeerTrust(resolvedId);
+    persistTrustState();
+    localStorage.setItem('orbit_friends', JSON.stringify(friends));
+    renderFriends();
+    tryConnect(resolvedId);
+
+    addFriendBtn.disabled = false;
+    addFriendBtn.textContent = '+';
+    alert('Friend added. Connection will sync when they are online.');
 }
 
 addFriendBtn.onclick = () => { addFriend(addFriendInput.value); addFriendInput.value = ''; };
 
 function handleIncomingConnection(conn) {
     conn.on('open', () => {
+        connectingPeers.delete(conn.peer);
         if (blockedPeers.includes(conn.peer)) {
             conn.close();
             return;
@@ -1267,11 +1446,13 @@ function handleIncomingConnection(conn) {
     });
 
     conn.on('close', () => {
+        connectingPeers.delete(conn.peer);
         delete activeConnections[conn.peer];
         renderFriends();
     });
 
     conn.on('error', () => {
+        connectingPeers.delete(conn.peer);
         delete activeConnections[conn.peer];
         renderFriends();
     });
@@ -1284,29 +1465,48 @@ if (backBtn) {
         currentChatFriend = null;
         chatWarningBanner.style.display = 'none';
         trustBadge.className = 'trust-badge trust-neutral';
-        trustBadge.textContent = 'Щит: ?';
+        trustBadge.textContent = 'Shield: ?';
         renderFriends();
     };
 }
-async function renderFriends() {
+let friendsRenderQueued = false;
+let messagesRenderQueued = false;
+let messagesRenderToken = 0;
+
+function renderFriends() {
+    if (friendsRenderQueued) return;
+    friendsRenderQueued = true;
+    requestAnimationFrame(() => {
+        friendsRenderQueued = false;
+        void renderFriendsNow();
+    });
+}
+
+async function renderFriendsNow() {
     friendsListContainer.innerHTML = '';
-    for (const f of friends) {
-        if (blockedPeers.includes(f.id)) continue;
+    const visibleFriends = friends.filter(f => !blockedPeers.includes(f.id));
+    const previewRows = await Promise.all(visibleFriends.map(async (f) => {
+        const key = `chat_${myNickname}_${f.id}`;
+        const history = await getHistoryFromDB(key);
+        const lastMsg = history.length > 0 ? history[history.length - 1] : null;
+        let preview = 'No messages';
+        let timeStr = '';
+        if (lastMsg) {
+            preview = lastMsg.type === 'text' ? lastMsg.content : (lastMsg.type === 'image' ? 'Photo' : 'File');
+            const d = new Date(lastMsg.ts);
+            timeStr = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+        }
+        return { id: f.id, preview, timeStr };
+    }));
+    const previewById = new Map(previewRows.map(r => [r.id, r]));
+
+    const fragment = document.createDocumentFragment();
+    for (const f of visibleFriends) {
         const isOnline = !!(activeConnections[f.id] && activeConnections[f.id].open);
         const trustData = getTrustBadgeData(f.id);
         const displayName = getDisplayNameByPeer(f.id);
         const avatarData = peerProfiles[f.id]?.avatarData || '';
-        
-        const key = `chat_${myNickname}_${f.id}`;
-        const history = await getHistoryFromDB(key);
-        const lastMsg = history.length > 0 ? history[history.length - 1] : null;
-        let preview = 'Нет сообщений';
-        let timeStr = '';
-        if (lastMsg) {
-            preview = lastMsg.type === 'text' ? lastMsg.content : (lastMsg.type === 'image' ? 'Фото' : 'Файл');
-            const d = new Date(lastMsg.ts);
-            timeStr = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-        }
+        const previewData = previewById.get(f.id) || { preview: 'No messages', timeStr: '' };
         
         const div = document.createElement('div');
         div.className = 'friend-item';
@@ -1330,7 +1530,7 @@ async function renderFriends() {
                 <div class="friend-name-container"></div>
                 <div class="friend-preview-row">
                     <span class="preview-container"></span>
-                    <span class="friend-time">${timeStr}</span>
+                    <span class="friend-time">${previewData.timeStr}</span>
                 </div>
                 <span class="friend-preview-text ${trustData.className}">${trustData.text}</span>
             </div>
@@ -1343,15 +1543,17 @@ async function renderFriends() {
         }
         div.querySelector('.friend-name-container').replaceWith(fName);
         div.querySelector('.preview-container').replaceWith(fPreview);
+        fPreview.textContent = previewData.preview;
 
         div.onclick = () => openChat(f.id);
-        friendsListContainer.appendChild(div);
+        fragment.appendChild(div);
     }
+    friendsListContainer.appendChild(fragment);
 }
 
 function openChat(friendId) {
     if (blockedPeers.includes(friendId)) {
-        alert('Пользователь заблокирован.');
+        alert('User is blocked.');
         return;
     }
     currentChatFriend = friendId;
@@ -1362,10 +1564,10 @@ function openChat(friendId) {
     chatAreaActive.style.display = 'flex';
     chatFriendName.textContent = getDisplayNameByPeer(friendId);
     if (isOffline) {
-        document.getElementById('chat-friend-status').textContent = 'ожидание сети...';
+        document.getElementById('chat-friend-status').textContent = 'waiting for network...';
         document.getElementById('chat-friend-status').style.color = 'var(--text-muted)';
     } else {
-        document.getElementById('chat-friend-status').textContent = (activeConnections[friendId] && activeConnections[friendId].open) ? 'в сети' : 'не в сети';
+        document.getElementById('chat-friend-status').textContent = (activeConnections[friendId] && activeConnections[friendId].open) ? 'online' : 'offline';
         document.getElementById('chat-friend-status').style.color = (activeConnections[friendId] && activeConnections[friendId].open) ? 'var(--success)' : 'var(--text-muted)';
     }
     currentChatAvatarText.textContent = getDisplayNameByPeer(friendId).substring(0,2).toUpperCase();
@@ -1408,27 +1610,44 @@ function scheduleTtlCleanup(friendId, ts, ttlMs) {
     }, ttlMs);
 }
 
-async function renderMessages() {
+function renderMessages() {
+    if (messagesRenderQueued) return;
+    messagesRenderQueued = true;
+    requestAnimationFrame(() => {
+        messagesRenderQueued = false;
+        messagesRenderToken += 1;
+        void renderMessagesNow(messagesRenderToken);
+    });
+}
+
+async function renderMessagesNow(renderToken) {
     if (!currentChatFriend) return;
+    const chatId = currentChatFriend;
     messagesList.innerHTML = '';
-    const key = `chat_${myNickname}_${currentChatFriend}`;
+    const key = `chat_${myNickname}_${chatId}`;
     const history = await getHistoryFromDB(key);
+    if (renderToken !== messagesRenderToken || chatId !== currentChatFriend) return;
     
-    history.forEach(msg => {
+    const fragment = document.createDocumentFragment();
+    history.forEach((msg, index) => {
         const div = document.createElement('div');
         div.className = `message ${msg.from === myNickname ? 'me' : 'them'}`;
+        if (history.length - index <= 20) div.classList.add('enter');
         
         if (msg.type === 'text') {
             div.textContent = msg.content;
         } else if (msg.type === 'image') {
             const img = document.createElement('img');
             img.src = msg.content;
+            img.loading = 'lazy';
+            img.decoding = 'async';
             img.style.cssText = 'max-width:100%; border-radius:8px;';
             div.appendChild(img);
         } else if (msg.type === 'video') {
             const vid = document.createElement('video');
             vid.src = msg.content;
             vid.controls = true;
+            vid.preload = 'metadata';
             vid.style.cssText = 'max-width:100%; border-radius:8px;';
             div.appendChild(vid);
         } else if (msg.type === 'file') {
@@ -1436,7 +1655,7 @@ async function renderMessages() {
             a.href = msg.content;
             a.download = msg.name || 'file';
             a.style.cssText = 'color:var(--accent); text-decoration:underline;';
-            a.textContent = `📎 Скачать ${msg.name || 'файл'}`;
+            a.textContent = `📎 Download ${msg.name || 'file'}`;
             div.appendChild(a);
         } else if (msg.type === 'audio') {
             const aud = document.createElement('audio');
@@ -1478,8 +1697,9 @@ async function renderMessages() {
 
         div.appendChild(timeDiv);
 
-        messagesList.appendChild(div);
+        fragment.appendChild(div);
     });
+    messagesList.appendChild(fragment);
     
     messagesList.scrollTop = messagesList.scrollHeight;
 }
@@ -1543,11 +1763,11 @@ sendVoiceBtn.addEventListener('pointerdown', (e) => {
             recordStartTime = Date.now();
             recordTimerInterval = setInterval(() => {
                 const secs = Math.floor((Date.now() - recordStartTime) / 1000);
-                chatInput.value = `🎤 Запись... 00:${secs.toString().padStart(2, '0')} (Свайп влево для отмены)`;
+                chatInput.value = `🎤 Recording... 00:${secs.toString().padStart(2, '0')} (Swipe left to cancel)`;
             }, 1000);
-            chatInput.value = `🎤 Запись... 00:00 (Свайп влево для отмены)`;
+            chatInput.value = `🎤 Recording... 00:00 (Swipe left to cancel)`;
         }).catch(err => {
-            alert("Нет доступа к микрофону");
+            alert('Microphone access denied.');
             recordingState = 'idle';
         });
     }
@@ -1594,7 +1814,7 @@ sendVoiceBtn.addEventListener('pointerup', async (e) => {
                 ttlMs: Number(ttlSelect.value || 0)
             });
         } catch (_) {
-            alert('Сессия заблокирована. Разблокируйте кабинет.');
+            alert('Session is locked. Unlock the vault.');
             return;
         }
         renderMessages();
@@ -1679,12 +1899,12 @@ async function receiveMessage(senderId, data) {
     
     if (data.type === 'typing') {
         if (appSettings.typingIndicator && currentChatFriend === senderId) {
-            document.getElementById('chat-friend-status').textContent = 'печатает...';
+            document.getElementById('chat-friend-status').textContent = 'typing...';
             document.getElementById('chat-friend-status').style.color = 'var(--success)';
             clearTimeout(window[`typing_${senderId}`]);
             window[`typing_${senderId}`] = setTimeout(() => {
                 const conn = activeConnections[senderId];
-                document.getElementById('chat-friend-status').textContent = (conn && conn.open) ? 'в сети' : 'не в сети';
+                document.getElementById('chat-friend-status').textContent = (conn && conn.open) ? 'online' : 'offline';
                 document.getElementById('chat-friend-status').style.color = (conn && conn.open) ? 'var(--success)' : 'var(--text-muted)';
             }, 3000);
         }
@@ -1891,10 +2111,10 @@ fileInput.onchange = (e) => {
 // === Calls ===
 function bindRemoteVideoStatus() {
     remoteVideo.onpause = () => {
-        if (activeCall) callStatus.textContent = 'Видео на паузе';
+        if (activeCall) callStatus.textContent = 'Video paused';
     };
     remoteVideo.onplaying = () => {
-        if (activeCall) callStatus.textContent = 'В звонке';
+        if (activeCall) callStatus.textContent = 'In call';
     };
 }
 
@@ -1904,6 +2124,15 @@ function handleIncomingCall(call) {
     incomingCallModal.style.display = 'flex';
     stopRingtone('in');
     incomingRingToneHandle = startRingtone('incoming');
+    const thisCallRef = call;
+    window.setTimeout(() => {
+        if (incomingCallTmp && incomingCallTmp === thisCallRef) {
+            stopRingtone('in');
+            incomingCallModal.style.display = 'none';
+            incomingCallTmp.close();
+            incomingCallTmp = null;
+        }
+    }, CALL_RING_TIMEOUT_MS);
     if (window.Notification && Notification.permission === 'granted') {
         new Notification(t.incoming, { body: `${call.peer} ${t.caller}`, icon: '/favicon.ico' });
     }
@@ -1933,13 +2162,13 @@ acceptCallBtn.onclick = () => {
 
         activeCall.answer(stream);
         callUserName.textContent = activeCall.peer;
-        callStatus.textContent = 'Соединение...';
+        callStatus.textContent = 'Connecting...';
         callScreen.style.display = 'flex';
         bindRemoteVideoStatus();
         
         activeCall.on('stream', (remoteStream) => {
             remoteVideo.srcObject = remoteStream;
-            callStatus.textContent = 'В звонке';
+            callStatus.textContent = 'In call';
         });
         activeCall.on('close', closeCallUI);
     });
@@ -1960,13 +2189,13 @@ screenBtn.onclick = async () => {
         const sStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         startCall(true, true, sStream);
     } catch(err) {
-        alert('Демонстрация экрана недоступна (возможно вы локально).');
+        alert('Screen sharing is unavailable in this environment.');
     }
 };
 
 async function startCall(videoOn, audioOn, screenStream = null) {
     if (!currentChatFriend) return;
-    if (isOffline) return alert('Нет сети. Звонок недоступен.');
+    if (isOffline) return alert('No network. Call is unavailable.');
     const conn = activeConnections[currentChatFriend];
     if (!conn || !conn.open) return alert(t.callingError);
 
@@ -2001,16 +2230,22 @@ async function startCall(videoOn, audioOn, screenStream = null) {
     stopRingtone('out');
     outgoingRingToneHandle = startRingtone('outgoing');
     callUserName.textContent = currentChatFriend;
-    callStatus.textContent = 'Соединение...';
+    callStatus.textContent = 'Connecting...';
     callScreen.style.display = 'flex';
     bindRemoteVideoStatus();
 
     activeCall.on('stream', (remoteStream) => {
         stopRingtone('out');
         remoteVideo.srcObject = remoteStream;
-        callStatus.textContent = 'В звонке';
+        callStatus.textContent = 'In call';
     });
-    activeCall.on('error', (err) => { stopRingtone('out'); alert('Связь прервалась.'); closeCallUI(); });
+    window.setTimeout(() => {
+        if (activeCall && !remoteVideo.srcObject) {
+            stopRingtone('out');
+            callStatus.textContent = 'No answer';
+        }
+    }, CALL_RING_TIMEOUT_MS);
+    activeCall.on('error', (err) => { stopRingtone('out'); alert('Connection was interrupted.'); closeCallUI(); });
     activeCall.on('close', closeCallUI);
 }
 
