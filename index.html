@@ -9,7 +9,23 @@
   <body>
     <!-- Login Panel -->
     <div id="login-panel" class="glass-panel">
-      <div class="brand-orbit-logo" aria-hidden="true"></div>
+      <div class="brand-orbit-logo-container" aria-hidden="true">
+        <svg class="brand-orbit-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="orbitGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--accent, #00FF41)" />
+              <stop offset="100%" stop-color="var(--accent-hover, #33ff66)" />
+            </linearGradient>
+            <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="8" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+          <circle cx="50" cy="50" r="40" fill="none" stroke="url(#orbitGlow)" stroke-width="4" filter="url(#neonGlow)" />
+          <circle cx="50" cy="50" r="20" fill="url(#orbitGlow)" filter="url(#neonGlow)" />
+          <path d="M 50 10 A 40 40 0 0 1 90 50" fill="none" stroke="#FFF" stroke-width="2" />
+        </svg>
+      </div>
       <h2>Orbits P2P</h2>
       <p class="brand-slogan">Stay in orbit</p>
       <p>Welcome to the decentralized network. Create your unique callsign.</p>
@@ -55,9 +71,18 @@
           </div>
         </div>
         <div id="bottom-nav">
-          <button id="bottom-chats-btn" class="nav-btn active">Chats</button>
-          <button id="bottom-contacts-btn" class="nav-btn">Contacts</button>
-          <button id="bottom-settings-btn" class="nav-btn">Settings</button>
+          <button id="bottom-chats-btn" class="nav-btn active">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>
+            Chats
+          </button>
+          <button id="bottom-contacts-btn" class="nav-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Contacts
+          </button>
+          <button id="bottom-settings-btn" class="nav-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            Settings
+          </button>
         </div>
       </div>
 
