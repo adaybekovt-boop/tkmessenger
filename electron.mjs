@@ -29,9 +29,28 @@ function createWindow() {
     });
     
     // Инициализация автообновления
-    autoUpdater.checkForUpdatesAndNotify();
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.checkForUpdates().catch(() => {});
   }
 }
+
+autoUpdater.on('update-available', () => {
+  console.log('[updater] update available');
+});
+
+autoUpdater.on('update-not-available', () => {
+  console.log('[updater] app is up to date');
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('[updater] error', err?.message || err);
+});
+
+autoUpdater.on('update-downloaded', () => {
+  console.log('[updater] update downloaded, restarting');
+  setTimeout(() => autoUpdater.quitAndInstall(), 1500);
+});
 
 app.whenReady().then(createWindow);
 
