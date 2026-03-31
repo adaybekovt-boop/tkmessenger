@@ -1,0 +1,102 @@
+name: Production Release CI/CD
+
+on:
+  push:
+    tags:
+      - 'v*' # Триггер: пуш тега (например, git tag v1.0.0 && git push origin v1.0.0)
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Build Windows (Electron)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run electron:build
+
+      - name: Generate Windows SHA256 Hash
+        run: Get-FileHash release/*Setup*.exe -Algorithm SHA256 | Out-File -Encoding UTF8 Orbit-Windows.sha256.txt
+
+      - name: Upload Windows EXE and Hash to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/*Setup*.exe
+            Orbit-Windows.sha256.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-android:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.10.0'
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17.0.9'
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: '8.4'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Add Capacitor Android Platform
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Inject Android WebRTC Permissions
+        run: |
+          sed -i '/<uses-permission android:name="android\.permission\.INTERNET" \/>/a \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application /<application android:usesCleartextTraffic="true" /g' android/app/src/main/AndroidManifest.xml
+
+      - name: Build Android Debug APK (Auto-signed)
+        working-directory: ./android
+        run: ./gradlew assembleDebug
+
+      - name: Rename APK and Generate Hash
+        run: |
+          mv android/app/build/outputs/apk/debug/app-debug.apk Orbit-Messenger-Android.apk
+          sha256sum Orbit-Messenger-Android.apk > Orbit-Android.sha256.txt
+
+      - name: Upload APK and Hash to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            Orbit-Messenger-Android.apk
+            Orbit-Android.sha256.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # iOS пока исключен из MVP (закомментирован) чтобы не блокировать процесс сертификатами
+  # build-ios:
+  #   runs-on: macos-latest
+  #   steps: ...
