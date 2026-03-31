@@ -61,3 +61,75 @@ export async function initWorkers() {
   await dbWorker.call('init');
   return true;
 }
+
+// ========== ДОБАВЛЕННЫЕ ЭКСПОРТЫ ДЛЯ main.js ==========
+/** Database operations with RPC */
+export async function dbInit() {
+  return dbWorker.call('init');
+}
+
+export async function dbGetPage(chatId, limit, beforeTs) {
+  return dbWorker.call('getPage', { chatId, limit, beforeTs });
+}
+
+export async function dbGetLast(chatId) {
+  return dbWorker.call('getLast', { chatId });
+}
+
+export async function dbAdd(row) {
+  return dbWorker.call('add', { row });
+}
+
+export async function dbUpdateStatus(chatId, ts, status) {
+  return dbWorker.call('updateStatus', { chatId, ts, status });
+}
+
+export async function dbDelete(chatId, ts) {
+  return dbWorker.call('delete', { chatId, ts });
+}
+
+export async function dbClearAll() {
+  return dbWorker.call('clearAll');
+}
+
+export async function dbGetPendingOut() {
+  return dbWorker.call('getPendingOut');
+}
+
+export async function dbSetPendingOut(items) {
+  return dbWorker.call('setPendingOut', { items });
+}
+
+// ========== CRYPTO EXPORTS ==========
+export async function cryptoDerive(password, nickname) {
+  return cryptoWorker.call('derive', { password, nickname });
+}
+
+export async function cryptoLock() {
+  return cryptoWorker.call('lock');
+}
+
+export async function cryptoEncrypt(obj) {
+  return cryptoWorker.call('encrypt', { obj });
+}
+
+export async function cryptoDecrypt(enc) {
+  return cryptoWorker.call('decrypt', { enc });
+}
+
+export async function cryptoDecryptBatch(encList) {
+  return cryptoWorker.call('decryptBatch', { encList });
+}
+
+export async function cryptoSha256Hex(str) {
+  return cryptoWorker.call('sha256Hex', { str });
+}
+
+export async function cryptoSha256Buffer(buffer) {
+  return cryptoWorker.call('sha256Buffer', { buffer });
+}
+
+// ========== FILE EXPORTS ==========
+export async function fileSha256Buffer(buffer) {
+  return fileWorker.call('sha256', { buffer });
+}
