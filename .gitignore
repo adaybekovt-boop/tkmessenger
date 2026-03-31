@@ -1,9 +1,0 @@
-node_modules/
-dist/
-release/
-android/
-ios/
-.DS_Store
-*.log
-.env
-.env.*
