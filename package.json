@@ -1,0 +1,68 @@
+{
+  "name": "orbits",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Decentralized P2P messenger with WebRTC and Electron installer builds.",
+  "author": "Orbits Team",
+  "type": "module",
+  "main": "electron.mjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adaybekovt-boop/tkmessenger.git"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "electron:build": "vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never",
+    "dist": "npm run electron:build"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "terser": "^5.46.1",
+    "vite": "^5.0.0",
+    "vite-plugin-singlefile": "^2.0.2"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
+    "electron-updater": "^6.1.7",
+    "peerjs": "^1.5.2"
+  },
+  "build": {
+    "appId": "com.orbit.messenger",
+    "productName": "Orbits P2P",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron.mjs",
+      "preload.cjs",
+      "splash.html",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "adaybekovt-boop",
+      "repo": "tkmessenger"
+    }
+  }
+}
