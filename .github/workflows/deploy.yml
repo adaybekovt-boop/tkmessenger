@@ -1,0 +1,95 @@
+name: Deploy Orbits Messenger
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: orbits_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+     
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm install
+
+      - name: Prisma Generate
+        run: npm run prisma:generate --workspace=server
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Run Tests
+        run: npm run test --if-present
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/orbits_db?schema=public
+          REDIS_URL: redis://localhost:6379
+
+      - name: Build
+        run: npm run build
+
+  deploy-backend:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npm run build --workspace=server
+      # Railway deployment would go here if using railway-cli
+      # - name: Deploy to Railway 
+      #   run: npx @railway/cli up
+      #   env:
+      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  deploy-frontend:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npm run build --workspace=client
+      # Vercel deployment would go here
+      # - name: Deploy to Vercel
+      #   uses: amondnet/vercel-action@v20
+      #   with:
+      #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
+      #     vercel-org-id: ${{ secrets.ORG_ID}}
+      #     vercel-project-id: ${{ secrets.PROJECT_ID}}
+      #     vercel-args: '--prod'
