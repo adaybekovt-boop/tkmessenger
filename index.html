@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Orbits P2P</title>
+  <style>
+    body { margin:0; background:#0f0f0f; color:#fff;
+           font-family:system-ui,sans-serif; overflow:hidden; }
+  </style>
+  <link rel="preload" href="./src/styles/style.css" as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="./src/styles/style.css"></noscript>
+</head>
+<body>
+
+<canvas id="theme-background" style="position:fixed;inset:0;z-index:-1;pointer-events:none"></canvas>
+
+<div id="login-panel">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+        <path d="M6 22L38 9L30 35L21 27L13 31L15 22Z" fill="white" opacity="0.92"/>
+        <path d="M21 27L30 18L15 22" fill="white" opacity="0.45"/>
+      </svg>
+    </div>
+    <h2 class="login-title">Orbits P2P</h2>
+    <p class="login-subtitle">Decentralized. Private. Yours.</p>
+
+    <div class="tg-field">
+      <input type="text" id="nickname-input" placeholder=" " autocomplete="username">
+      <label for="nickname-input">Your callsign</label>
+    </div>
+    <div class="tg-field">
+      <input type="password" id="password-input" placeholder=" " autocomplete="current-password">
+      <label for="password-input">Master password</label>
+    </div>
+
+    <div class="consent-row">
+      <input type="checkbox" id="privacy-consent">
+      <span>I accept the
+        <button id="open-policy-btn" class="link-btn">Privacy Policy</button>
+      </span>
+    </div>
+
+    <button id="login-btn" class="tg-primary-btn" disabled>Join network</button>
+  </div>
+</div>
+
+<div id="app-container" style="display:none">
+
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <button id="open-settings-btn" class="tg-icon-btn" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <rect y="3" width="20" height="2" rx="1"/>
+          <rect y="9" width="20" height="2" rx="1"/>
+          <rect y="15" width="20" height="2" rx="1"/>
+        </svg>
+      </button>
+      <div class="sidebar-search-wrap">
+        <svg class="sidebar-search-icon" width="15" height="15" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input class="sidebar-search-input" type="text" placeholder="Search"
+               id="add-friend-input">
+      </div>
+      <button id="add-friend-btn" style="display:none">+</button>
+    </div>
+
+    <div id="friends-list"></div>
+    <div id="contacts-empty-state" class="contacts-empty-placeholder" style="display:none">
+      No contacts yet. Search by nickname to add friends.
+    </div>
+
+    <div id="my-profile">
+      <div class="friend-avatar" id="my-avatar-letter">Me</div>
+      <div class="my-info">
+        <span id="my-id-display">Loading...</span>
+        <span id="my-status" class="status-online">Online</span>
+      </div>
+    </div>
+
+    <div id="bottom-nav" role="navigation">
+      <button id="bottom-chats-btn" class="nav-btn active">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/>
+        </svg>
+        Chats
+      </button>
+      <button id="bottom-contacts-btn" class="nav-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Contacts
+      </button>
+      <button id="bottom-radar-btn" class="nav-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="2"/>
+          <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>
+        </svg>
+        Radar
+      </button>
+      <button id="bottom-settings-btn" class="nav-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        Settings
+      </button>
+    </div>
+  </div>
+
+  <div id="empty-state">
+    <span>Select a contact to start chatting</span>
+  </div>
+
+  <div id="active-chat" style="display:none">
+    <div id="chat-header">
+      <button id="back-btn" class="tg-icon-btn" style="display:none">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M19 12H5M12 5l-7 7 7 7"/>
+        </svg>
+      </button>
+      <div class="chat-header-info">
+        <div id="current-chat-avatar" class="chat-avatar"></div>
+        <div class="chat-header-text">
+          <span id="chat-friend-name"></span>
+          <span id="chat-friend-status"></span>
+        </div>
+      </div>
+      <div class="chat-header-actions">
+        <span id="trust-badge" class="trust-badge trust-neutral" style="display:none">Shield: ?</span>
+        <button id="screen-btn" class="tg-icon-btn" title="Screen share">🖥</button>
+        <button id="audio-call-btn" class="tg-icon-btn" title="Voice call">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 6.29 6.29l1.62-1.62a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </button>
+        <button id="call-btn" class="tg-icon-btn" title="Video call">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+        </button>
+        <button id="report-peer-btn" class="tg-icon-btn" title="More">⋮</button>
+      </div>
+    </div>
+
+    <div id="chat-warning-banner" style="display:none"></div>
+
+    <div id="messages-list"></div>
+
+    <div id="chat-input-area">
+      <button id="file-btn" class="tg-icon-btn" aria-label="Attach">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+      <input type="file" id="file-input" hidden>
+      <div class="chat-input-pill">
+        <textarea id="chat-input" rows="1" placeholder="Message..."></textarea>
+        <select id="ttl-select" title="Message lifetime">
+          <option value="0">∞</option>
+          <option value="30000">30s</option>
+          <option value="60000">1m</option>
+          <option value="3600000">1h</option>
+        </select>
+      </div>
+      <button id="send-voice-btn" class="tg-send-btn voice-mode">
+        <span id="mic-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+          </svg>
+        </span>
+        <span id="send-icon" style="display:none">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <div id="radar-view" style="display:none" aria-hidden="true">
+    <div class="radar-container">
+      <div class="radar-sonar"></div>
+      <p>🔍 Scan</p>
+      <button id="radar-scan-btn" class="tg-primary-btn" style="width:auto;padding:0 24px">Scan</button>
+      <div id="radar-results"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="settings-modal" aria-hidden="true">
+  <div class="settings-header">
+    <button id="close-settings-btn" class="tg-icon-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+    </button>
+    <span class="settings-title-text">Settings</span>
+    <button id="save-settings-btn" class="tg-icon-btn" style="color:var(--tg-accent)">✓</button>
+  </div>
+  <div class="settings-body">
+    <div class="settings-section-title">Profile</div>
+    <div class="settings-row">
+      <span class="settings-row-label">Display name</span>
+      <input type="text" id="settings-display-name" placeholder="Optional name">
+    </div>
+
+    <div class="settings-section-title">Microphone</div>
+    <div class="settings-row">
+      <span class="settings-row-label">Input device</span>
+      <select id="mic-device-select"></select>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Echo cancellation</span>
+      <label class="tg-toggle"><input type="checkbox" id="echo-cancel-toggle" checked>
+        <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Noise suppression</span>
+      <label class="tg-toggle"><input type="checkbox" id="noise-suppression-toggle" checked>
+        <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Auto gain</span>
+      <label class="tg-toggle"><input type="checkbox" id="auto-gain-toggle" checked>
+        <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+    </div>
+    <button id="test-mic-btn" class="settings-btn settings-btn-default">Test microphone</button>
+    <button id="stop-mic-test-btn" class="settings-btn settings-btn-default" style="display:none">Stop test</button>
+    <div id="mic-level-bar" style="height:4px;background:var(--tg-accent);width:0%;margin:0 16px;border-radius:2px;transition:width 0.1s"></div>
+
+    <div class="settings-section-title">Network</div>
+    <div class="settings-row">
+      <span class="settings-row-label">Auto video quality</span>
+      <label class="tg-toggle"><input type="checkbox" id="auto-quality-toggle" checked>
+        <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Video quality</span>
+      <select id="video-quality-select" disabled>
+        <option value="low">Low (320p)</option>
+        <option value="medium" selected>Medium (360p)</option>
+        <option value="high">High (720p)</option>
+      </select>
+    </div>
+    <button id="run-network-test-btn" class="settings-btn settings-btn-default">Run network test</button>
+    <div id="network-test-result" style="padding:8px 16px;font-size:13px;color:var(--tg-text-secondary)"></div>
+
+    <div class="settings-section-title">Themes</div>
+    <div style="padding:8px 16px;display:flex;flex-wrap:wrap;gap:8px">
+      <button class="theme-preset-btn" data-theme="none">⬛ None</button>
+      <button class="theme-preset-btn" data-theme="aurora">🌀 Aurora</button>
+      <button class="theme-preset-btn" data-theme="stellar">✨ Stellar</button>
+      <button class="theme-preset-btn" data-theme="retro">📡 Retro</button>
+      <button class="theme-preset-btn" data-theme="abyss">🌊 Abyss</button>
+      <button class="theme-preset-btn" data-theme="draft">📐 Draft</button>
+    </div>
+
+    <div class="settings-section-title">Interface</div>
+    <div class="settings-row">
+      <span class="settings-row-label">Typing indicator</span>
+      <label class="tg-toggle"><input type="checkbox" id="typing-indicator-toggle" checked>
+        <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+    </div>
+
+    <div class="settings-section-title">Security</div>
+    <div class="settings-row">
+      <span class="settings-row-label">Duress password</span>
+      <input type="password" id="duress-password-input" placeholder="Min 6 chars">
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Allow screenshots</span>
+      <label class="tg-toggle"><input type="checkbox" id="allow-screenshots-toggle">
+        <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+    </div>
+    <button id="panic-wipe-btn" class="settings-btn settings-btn-danger">⚠️ Wipe all local data</button>
+  </div>
+</div>
+
+<div id="policy-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Privacy Policy</h3>
+    <div id="policy-scrollbox" class="tg-modal-text">
+      <p><strong>Zero server storage:</strong> Orbits does not store your messages,
+      keys, or media on centralized servers.</p>
+      <p><strong>Local control:</strong> Chat history is stored locally on your device.</p>
+      <p><strong>Responsibility:</strong> If you lose your password, access cannot be
+      restored — there is no centralized recovery.</p>
+      <p><strong>Technical logs:</strong> Only technical metadata is used to establish
+      P2P connections (node ID, NAT type).</p>
+    </div>
+    <button id="accept-policy-btn" class="tg-primary-btn">Accept and continue</button>
+    <button id="close-policy-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<div id="report-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Report user</h3>
+    <p class="tg-modal-text">Select a reason. The user will be blocked locally.</p>
+    <label style="display:block;padding:8px 0"><input type="radio" name="report-reason" value="spam" checked> Spam</label>
+    <label style="display:block;padding:8px 0"><input type="radio" name="report-reason" value="fraud"> Fraud</label>
+    <label style="display:block;padding:8px 0"><input type="radio" name="report-reason" value="abuse"> Abuse</label>
+    <button id="submit-report-btn" class="settings-btn settings-btn-danger">Report and block</button>
+    <button id="close-report-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Cancel</button>
+  </div>
+</div>
+
+<div id="vault-lock-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Session locked</h3>
+    <p class="tg-modal-text">The app was minimized for over 5 minutes. Enter your master password.</p>
+    <div class="tg-field">
+      <input type="password" id="unlock-password-input" placeholder=" ">
+      <label>Master password</label>
+    </div>
+    <button id="unlock-vault-btn" class="tg-primary-btn">Unlock</button>
+  </div>
+</div>
+
+<div id="incoming-call-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card" style="text-align:center">
+    <h3 class="tg-modal-title" id="caller-name">Incoming call</h3>
+    <p class="tg-modal-text" id="call-type-label">is calling...</p>
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:16px">
+      <button id="reject-call-btn" class="settings-btn settings-btn-danger" style="flex:1">Decline</button>
+      <button id="accept-call-btn" class="tg-primary-btn" style="flex:1">Accept</button>
+    </div>
+  </div>
+</div>
+
+<div id="call-screen" style="display:none">
+  <div class="call-container">
+    <video id="remote-video" autoplay playsinline></video>
+    <video id="local-video" autoplay playsinline muted></video>
+    <div class="call-info">
+      <div id="call-user-name"></div>
+      <div id="call-status">Calling...</div>
+    </div>
+    <div class="call-controls">
+      <button id="call-toggle-audio" class="tg-icon-btn call-btn">🎤</button>
+      <button id="call-toggle-video" class="tg-icon-btn call-btn">📹</button>
+      <button id="end-call-btn" class="tg-icon-btn call-btn call-end">📵</button>
+    </div>
+  </div>
+</div>
+
+<div id="nearby-peer-modal" style="display:none">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Nearby peer</h3>
+    <p class="tg-modal-text" id="nearby-peer-id"></p>
+    <button id="nearby-send-btn" class="tg-primary-btn">Send Message</button>
+    <button id="nearby-add-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Add to Contacts</button>
+    <button id="nearby-close-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+
+</body>
+</html>
