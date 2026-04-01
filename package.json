@@ -13,6 +13,7 @@
     "dev:client": "npm run dev --workspace=client",
     "build:server": "npm run build --workspace=server",
     "build:client": "npm run build --workspace=client",
+    "build": "npm run build:server && npm run build:client",
     "start:server": "npm run start --workspace=server",
     "test:server": "npm run test --workspace=server",
     "prisma:generate": "npm run prisma:generate --workspace=server",
