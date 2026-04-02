@@ -1,0 +1,6 @@
+{
+	"appId": "com.orbits.p2p",
+	"appName": "Orbits P2P",
+	"webDir": "dist",
+	"bundledWebRuntime": false
+}
