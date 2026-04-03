@@ -70,12 +70,12 @@
         <input class="sidebar-search-input" type="text" placeholder="Search"
                id="add-friend-input">
       </div>
-      <button id="create-group-btn" class="tg-icon-btn" aria-label="New Group" title="Create group">
+      <button id="open-add-friend-btn" class="tg-icon-btn" aria-label="Add Friend" title="Add Friend">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <line x1="19" y1="8" x2="19" y2="14"/>
-          <line x1="22" y1="11" x2="16" y2="11"/>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="8.5" cy="7" r="4"/>
+          <line x1="20" y1="8" x2="20" y2="14"/>
+          <line x1="23" y1="11" x2="17" y2="11"/>
         </svg>
       </button>
       <button id="add-friend-btn" style="display:none">+</button>
@@ -83,7 +83,7 @@
 
     <div id="friends-list"></div>
     <div id="contacts-empty-state" class="contacts-empty-placeholder" style="display:none">
-      No contacts yet. Search by nickname to add friends.
+      No contacts yet. Tap the person+ button to add friends.
     </div>
 
     <div id="my-profile">
@@ -527,6 +527,28 @@
     <button type="button" id="nearby-send-btn" class="tg-primary-btn">Send Message</button>
     <button id="nearby-add-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Add to Contacts</button>
     <button id="nearby-close-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<div id="add-friend-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Add Contact</h3>
+    <p class="tg-modal-text" style="font-size:13px;margin-bottom:8px;color:var(--tg-text-secondary)">Your ID — share it with friends:</p>
+    <div style="display:flex;align-items:center;gap:8px;background:var(--tg-bg-input);border-radius:10px;padding:10px 14px;margin-bottom:16px;">
+      <code id="my-peer-id-display" style="flex:1;font-family:monospace;font-size:16px;letter-spacing:2px;color:var(--tg-accent);font-weight:bold"></code>
+      <button id="copy-my-id-btn" class="tg-icon-btn" title="Copy ID" style="width:32px;height:32px;flex-shrink:0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      </button>
+    </div>
+    <div class="tg-field">
+      <input type="text" id="add-friend-id-input" placeholder=" " autocomplete="off" maxlength="9" style="text-transform:uppercase;letter-spacing:1px">
+      <label for="add-friend-id-input">Friend's ID</label>
+    </div>
+    <button id="confirm-add-friend-btn" class="tg-primary-btn">Add Contact</button>
+    <button id="close-add-friend-modal-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Cancel</button>
   </div>
 </div>
 
