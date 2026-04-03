@@ -1061,7 +1061,6 @@ async function openChat(friendId) {
   const chatSig = chatAbortController.signal;
 
   currentChatFriend = friendId;
-  document.getElementById('empty-state').style.display = 'none';
   document.getElementById('active-chat').style.display = 'flex';
   document.getElementById('chat-friend-name').textContent = friendId;
   
@@ -1164,12 +1163,6 @@ function closeCurrentChat() {
   activeObjectUrls.forEach(u => URL.revokeObjectURL(u));
   activeObjectUrls.clear();
   document.getElementById('active-chat').style.display = 'none';
-  // FIX: показываем пустое состояние только если не открыт радар и не открыты настройки
-  const radarVisible = document.getElementById('radar-view').style.display === 'flex';
-  const settingsVisible = document.getElementById('settings-modal').style.display === 'flex';
-  if (!radarVisible && !settingsVisible) {
-    document.getElementById('empty-state').style.display = 'flex';
-  }
 }
 
 async function loadInitialMessagesForChat() {
@@ -1564,10 +1557,6 @@ function closeSettingsPanel() {
   setTimeout(() => {
     modal.style.display = 'none';
     if (currentView === 'settings') currentView = currentChatFriend ? 'chat' : null;
-    // FIX: проверяем, нужно ли показать empty-state после закрытия настроек
-    if (!currentChatFriend && document.getElementById('radar-view').style.display !== 'flex') {
-      document.getElementById('empty-state').style.display = 'flex';
-    }
   }, 300);
 }
 
@@ -1766,8 +1755,6 @@ function switchToRadar() {
   document.getElementById('radar-view').style.display = 'flex';
   document.getElementById('radar-view').removeAttribute('aria-hidden');
   radarController.activate();
-  // FIX: скрываем empty-state когда радар активен
-  document.getElementById('empty-state').style.display = 'none';
 }
 
 function hideRadarIfActive() {
@@ -1775,10 +1762,6 @@ function hideRadarIfActive() {
   document.getElementById('radar-view').setAttribute('aria-hidden', 'true');
   radarController.deactivate();
   if (currentView === 'radar') currentView = currentChatFriend ? 'chat' : null;
-  // FIX: если чат не открыт, показываем empty-state
-  if (!currentChatFriend && document.getElementById('settings-modal').style.display !== 'flex') {
-    document.getElementById('empty-state').style.display = 'flex';
-  }
 }
 
 let mediaRecorderInstance = null;
