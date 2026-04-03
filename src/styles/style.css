@@ -276,6 +276,18 @@ body {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.trust-badge {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-avatar {
@@ -862,13 +874,6 @@ select {
   color: var(--tg-accent);
 }
 
-.trust-badge {
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  white-space: nowrap;
-}
-
 .trust-neutral { background: var(--tg-bg-elevated); color: var(--tg-text-secondary); }
 .trust-good { background: rgba(74, 222, 128, 0.15); color: #86efac; }
 .trust-high { background: rgba(74, 222, 128, 0.2); color: #86efac; }
@@ -1240,14 +1245,29 @@ html.low-perf #messages-list {
   will-change: auto;
 }
 
-
+/* ========== ИСПРАВЛЕНИЯ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ========== */
 @media (max-width: 768px) {
+  /* Убираем убийцу empty-state — больше никогда не скрываем его принудительно */
+  /* #app-container:not(.chat-open) #empty-state { display: none; }  УДАЛЕНО */
+
+  /* Скрываем сайдбар, когда чат открыт, чтобы он не перекрывал чат и не мешал */
+  #app-container.chat-open #sidebar {
+    display: none;
+  }
+
+  /* Обеспечиваем корректное отображение сайдбара, когда чат закрыт */
+  #app-container:not(.chat-open) #sidebar {
+    display: flex !important;
+  }
+
+  /* Остальные стили остаются без изменений */
   #app-container:not(.chat-open) {
     flex-direction: column;
     align-items: stretch;
   }
   #app-container:not(.chat-open) #empty-state {
-    display: none;
+    /* Теперь empty-state виден всегда, когда чат закрыт и нет других модалок */
+    display: flex;
   }
   #sidebar {
     width: 100%;
@@ -1282,6 +1302,21 @@ html.low-perf #messages-list {
   #app-container:not(.chat-open) #active-chat { display: none !important; }
 }
 
+/* Отключаем все анимации и переходы для пользователей, которые предпочитают минимальное движение */
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .skeleton-bubble {
+    animation: none !important;
+  }
+  .tg-toggle-knob {
+    transition: none !important;
+  }
+  .radar-peer-chip {
+    transition: none !important;
+  }
 }

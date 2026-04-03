@@ -4,7 +4,6 @@ import { cryptoDerive, cryptoLock, cryptoEncrypt, cryptoDecrypt, cryptoDecryptBa
 import { fileSha256Buffer } from './core/file.js';
 import { VirtualScroller } from './ui/virtualScroll.js';
 import { createCallManager } from './core/callManager.js';
-// Themes: getThemeManager() on first use. Workers load via new URL('.../workers/*.js', import.meta.url) in theme/db/crypto modules; Vite base:'./' keeps paths valid on GitHub Pages.
 import { getThemeManager } from './ui/themeManager.js';
 import { Radar } from './ui/radar.js';
 import { showToast } from './ui/toast.js';
@@ -30,7 +29,6 @@ let currentView = null;
 let radarController = null;
 let peerRtt = {};
 let outgoingChunkCache = new Map();
-/** Incoming chunked transfers: set values with `expires: Date.now() + INCOMING_TRANSFER_TTL_MS` */
 const incomingTransfers = new Map();
 const typingTimers = new Map();
 const activeObjectUrls = new Set();
@@ -938,6 +936,7 @@ function _initPeerConnection(nick) {
 }
 
 function connectToAllFriends() {
+  if (!peer || peer.destroyed) return; // FIX: защита от вызова после уничтожения пира
   friends.forEach((f, i) => setTimeout(() => tryConnect(f.id), i * 150));
   scheduleHeartbeat();
 }
@@ -1066,6 +1065,9 @@ function cleanupCurrentView() {
   chatAbortController?.abort();
   chatAbortController = null;
   if (msgsVirtual) { msgsVirtual.destroy(); msgsVirtual = null; }
+  // FIX: сбрасываем флаги загрузки сообщений при закрытии чата
+  messagesLoadingOlder = false;
+  hasMoreOlderMessages = true;
 }
 
 async function openChat(friendId) {
@@ -1179,7 +1181,12 @@ function closeCurrentChat() {
   activeObjectUrls.forEach(u => URL.revokeObjectURL(u));
   activeObjectUrls.clear();
   document.getElementById('active-chat').style.display = 'none';
-  document.getElementById('empty-state').style.display = 'flex';
+  // FIX: показываем пустое состояние только если не открыт радар и не открыты настройки
+  const radarVisible = document.getElementById('radar-view').style.display === 'flex';
+  const settingsVisible = document.getElementById('settings-modal').style.display === 'flex';
+  if (!radarVisible && !settingsVisible) {
+    document.getElementById('empty-state').style.display = 'flex';
+  }
 }
 
 async function loadInitialMessagesForChat() {
@@ -1427,11 +1434,7 @@ async function receiveMessage(senderId, data) {
   }
 }
 
-async function sendChunkedFile(file, type, name) {
-  // Not fully implemented to keep code size reasonable, but required by prompt to exist
-  showToast('File transfer started');
-}
-
+// FIX: реализована отправка файлов с чанкингом для больших файлов (избегаем base64 взрыва)
 async function sendMediaBlob(file, type, name) {
   touchUserActivity();
   let workFile = file;
@@ -1444,6 +1447,15 @@ async function sendMediaBlob(file, type, name) {
       console.warn('Image compress skipped', err);
     }
   }
+  
+  // Для файлов больше 10 МБ используем чанкинг (избегаем data URL)
+  const MAX_INLINE_SIZE = 10 * 1024 * 1024;
+  if (workFile.size > MAX_INLINE_SIZE) {
+    showToast('Large file: sending in chunks...');
+    await sendChunkedFile(workFile, type, workName);
+    return;
+  }
+  
   const reader = new FileReader();
   reader.onload = async (e) => {
     const buffer = e.target.result;
@@ -1477,6 +1489,39 @@ async function sendMediaBlob(file, type, name) {
     }
   };
   reader.readAsArrayBuffer(workFile);
+}
+
+async function sendChunkedFile(file, type, name) {
+  // Простая реализация чанкинга по 256KB
+  const CHUNK_SIZE = 256 * 1024;
+  const chunks = Math.ceil(file.size / CHUNK_SIZE);
+  const transferId = `${Date.now()}-${Math.random()}`;
+  for (let i = 0; i < chunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunkBlob = file.slice(start, end);
+    const reader = new FileReader();
+    const chunkData = await new Promise((resolve) => {
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsArrayBuffer(chunkBlob);
+    });
+    const conn = activeConnections[currentChatFriend];
+    if (!conn?.open) {
+      showToast('Connection lost during upload');
+      return;
+    }
+    conn.send({
+      type: 'orbit_chunk',
+      transferId,
+      index: i,
+      total: chunks,
+      data: Array.from(new Uint8Array(chunkData)),
+      name,
+      mime: file.type,
+      final: i === chunks - 1
+    });
+  }
+  showToast(`Sent ${chunks} chunks`);
 }
 
 function arrayBufferToDataUrl(buffer, mimeType) {
@@ -1536,6 +1581,10 @@ function closeSettingsPanel() {
   setTimeout(() => {
     modal.style.display = 'none';
     if (currentView === 'settings') currentView = currentChatFriend ? 'chat' : null;
+    // FIX: проверяем, нужно ли показать empty-state после закрытия настроек
+    if (!currentChatFriend && document.getElementById('radar-view').style.display !== 'flex') {
+      document.getElementById('empty-state').style.display = 'flex';
+    }
   }, 300);
 }
 
@@ -1646,12 +1695,41 @@ function runNetworkTest() {
   if (res) res.textContent = 'Testing... (mock)';
 }
 
+let micStream = null;
 function startMicTest() {
-  // Mock
+  if (micStream) stopMicTest();
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      micStream = stream;
+      document.getElementById('test-mic-btn').style.display = 'none';
+      document.getElementById('stop-mic-test-btn').style.display = 'inline-block';
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      source.connect(analyser);
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      function updateLevel() {
+        if (!micStream) return;
+        analyser.getByteFrequencyData(dataArray);
+        let avg = 0;
+        for (let i = 0; i < dataArray.length; i++) avg += dataArray[i];
+        avg /= dataArray.length;
+        const percent = Math.min(100, (avg / 255) * 100);
+        document.getElementById('mic-level-bar').style.width = percent + '%';
+        requestAnimationFrame(updateLevel);
+      }
+      updateLevel();
+    })
+    .catch(() => showToast('Microphone access denied'));
 }
-
 function stopMicTest() {
-  // Mock
+  if (micStream) {
+    micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+  }
+  document.getElementById('test-mic-btn').style.display = 'inline-block';
+  document.getElementById('stop-mic-test-btn').style.display = 'none';
+  document.getElementById('mic-level-bar').style.width = '0%';
 }
 
 function ensurePeerTrust(peerId) {
@@ -1705,6 +1783,8 @@ function switchToRadar() {
   document.getElementById('radar-view').style.display = 'flex';
   document.getElementById('radar-view').removeAttribute('aria-hidden');
   radarController.activate();
+  // FIX: скрываем empty-state когда радар активен
+  document.getElementById('empty-state').style.display = 'none';
 }
 
 function hideRadarIfActive() {
@@ -1712,34 +1792,43 @@ function hideRadarIfActive() {
   document.getElementById('radar-view').setAttribute('aria-hidden', 'true');
   radarController.deactivate();
   if (currentView === 'radar') currentView = currentChatFriend ? 'chat' : null;
+  // FIX: если чат не открыт, показываем empty-state
+  if (!currentChatFriend && document.getElementById('settings-modal').style.display !== 'flex') {
+    document.getElementById('empty-state').style.display = 'flex';
+  }
 }
 
-let mediaRecorder;
+let mediaRecorderInstance = null;
 let voiceChunks = [];
 document.getElementById('send-voice-btn').addEventListener('pointerdown', async () => {
-  if (chatInput.value.trim()) return; // text mode — handled by click
+  const chatInputEl = document.getElementById('chat-input');
+  if (chatInputEl.value.trim()) return; // text mode
+  if (mediaRecorderInstance && mediaRecorderInstance.state === 'recording') return;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorderInstance = new MediaRecorder(stream);
     voiceChunks = [];
-    mediaRecorder.ondataavailable = e => voiceChunks.push(e.data);
-    mediaRecorder.start();
+    mediaRecorderInstance.ondataavailable = e => voiceChunks.push(e.data);
+    mediaRecorderInstance.start();
   } catch (err) {
     showToast('Mic access denied');
   }
 });
 document.getElementById('send-voice-btn').addEventListener('pointerup', () => {
-  if (mediaRecorder && mediaRecorder.state === 'recording') {
-    mediaRecorder.onstop = () => {
+  if (mediaRecorderInstance && mediaRecorderInstance.state === 'recording') {
+    mediaRecorderInstance.onstop = () => {
       const blob = new Blob(voiceChunks, { type: 'audio/webm' });
       sendMediaBlob(blob, 'audio', 'voice_msg.webm');
+      if (mediaRecorderInstance.stream) {
+        mediaRecorderInstance.stream.getTracks().forEach(t => t.stop());
+      }
+      mediaRecorderInstance = null;
     };
-    mediaRecorder.stop();
-    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    mediaRecorderInstance.stop();
   }
 });
 document.getElementById('send-voice-btn').addEventListener('pointermove', (e) => {
-  // Swipe cancel mock
+  // swipe cancel mock
 });
 
 const chatInput = document.getElementById('chat-input');
@@ -1748,8 +1837,10 @@ function handleChatInput() {
   chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + 'px';
 
   const hasText = chatInput.value.trim().length > 0;
-  document.getElementById('mic-icon').style.display = hasText ? 'none' : '';
-  document.getElementById('send-icon').style.display = hasText ? '' : 'none';
+  const micIcon = document.getElementById('mic-icon');
+  const sendIcon = document.getElementById('send-icon');
+  if (micIcon) micIcon.style.display = hasText ? 'none' : '';
+  if (sendIcon) sendIcon.style.display = hasText ? '' : 'none';
   document.getElementById('send-voice-btn').classList.toggle('voice-mode', !hasText);
 
   if (optimizer.typingAllowed() && currentChatFriend && activeConnections[currentChatFriend]) {
@@ -1831,8 +1922,23 @@ function scheduleHeartbeat() {
   }, ms);
 }
 
-function flushOutgoingQueue() {
-  // Mock flush
+async function flushOutgoingQueue() {
+  if (!pendingOutgoing.length) return;
+  for (const msg of pendingOutgoing) {
+    const conn = activeConnections[msg.to];
+    if (conn?.open) {
+      try {
+        const cipher = await encryptWirePayload(chatKey(msg.to), msg);
+        conn.send({ type: 'orbit_wire', cipher });
+        await dbUpdateStatus(chatKey(msg.to), msg.ts, 'sent');
+        registerPendingAck(chatKey(msg.to), msg.ts);
+      } catch (err) {
+        console.error('Failed to flush outgoing', err);
+      }
+    }
+  }
+  await dbSetPendingOut([]);
+  pendingOutgoing = [];
 }
 
 if (document.readyState === 'loading') {
