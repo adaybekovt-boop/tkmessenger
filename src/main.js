@@ -10,6 +10,29 @@ import { showToast } from './ui/toast.js';
 import { encryptWirePayload, decryptWirePayload } from './core/wireCrypto.js';
 import { optimizer } from './core/optimizer.js';
 
+async function getOrCreatePeerId(nick) {
+  const stored = localStorage.getItem('orbit_peer_id');
+  if (stored) return stored;
+  const fp = [
+    nick,
+    navigator.userAgent,
+    `${screen.width}x${screen.height}`,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    navigator.language
+  ].join('|');
+  const hash = await cryptoSha256Hex(fp);
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const id = Array.from(hash)
+    .filter((_, i) => i % 2 === 0)
+    .slice(0, 9)
+    .map(c => chars[parseInt(c, 16) % chars.length])
+    .join('');
+  localStorage.setItem('orbit_peer_id', id);
+  return id;
+}
+let myPeerId = localStorage.getItem('orbit_peer_id') || '';
+let friendProfiles = JSON.parse(localStorage.getItem('orbit_friend_profiles') || '{}');
+
 let peer = null;
 let myNickname = '';
 let friends = JSON.parse(localStorage.getItem('orbit_friends') || '[]');
@@ -651,9 +674,20 @@ function initAppChrome() {
   document.getElementById('open-settings-btn').addEventListener('click', openSettingsPanel);
   document.getElementById('close-settings-btn').addEventListener('click', closeSettingsPanel);
   document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
-  document.getElementById('add-friend-btn').addEventListener('click', () => {
-    const id = document.getElementById('add-friend-input').value.trim();
-    if (id) addFriend(id);
+  document.getElementById('open-add-friend-btn').addEventListener('click', openAddFriendModal);
+  document.getElementById('close-add-friend-modal-btn').addEventListener('click', closeAddFriendModal);
+  document.getElementById('copy-my-id-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(myPeerId).then(() => showToast('ID copied!')).catch(() => showToast(myPeerId));
+  });
+  document.getElementById('confirm-add-friend-btn').addEventListener('click', () => {
+    const id = document.getElementById('add-friend-id-input').value.trim();
+    if (id) { addFriend(id); closeAddFriendModal(); }
+  });
+  document.getElementById('add-friend-id-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const id = e.target.value.trim();
+      if (id) { addFriend(id); closeAddFriendModal(); }
+    }
   });
   
   document.getElementById('back-btn').addEventListener('click', closeCurrentChat);
@@ -760,13 +794,6 @@ function initAppChrome() {
     e.target.value = '';
   });
 
-  // Add friend on Enter key in search input
-  document.getElementById('add-friend-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const id = e.target.value.trim();
-      if (id) addFriend(id);
-    }
-  });
 
   // Settings extra buttons
   document.getElementById('test-mic-btn').addEventListener('click', startMicTest);
@@ -818,7 +845,7 @@ async function loginHandler() {
   
   const ok = await verifyAndUnlockVault(nick, pass);
   if (ok) {
-    startOrbit(nick);
+    await startOrbit(nick);
   } else {
     showToast('Wrong password');
   }
@@ -852,27 +879,37 @@ async function verifyAndUnlockVault(nick, pass) {
   return true;
 }
 
-function startOrbit(nick) {
+async function startOrbit(nick) {
   myNickname = nick;
+  myPeerId = await getOrCreatePeerId(nick);
+
+  if (!orbitProfile.displayName) {
+    orbitProfile.displayName = nick;
+    persistOrbitProfile();
+  }
   document.getElementById('login-panel').style.display = 'none';
   document.getElementById('app-container').style.display = 'flex';
-  
-  document.getElementById('my-avatar-letter').textContent = nick.charAt(0).toUpperCase();
-  document.getElementById('my-id-display').textContent = nick;
+
+  const displayLetter = (orbitProfile.displayName || myPeerId).charAt(0).toUpperCase();
+  document.getElementById('my-avatar-letter').textContent = displayLetter;
+  document.getElementById('my-id-display').textContent = orbitProfile.displayName || myPeerId;
   const myStatusEl = document.getElementById('my-status');
   myStatusEl.classList.remove('hidden', 'status-offline');
   myStatusEl.classList.add('status-online');
   myStatusEl.textContent = 'Connecting…';
   applyProfileToUI();
   renderProfilePhotoGrid();
-  
+
+  const peerIdEl = document.getElementById('my-peer-id-display');
+  if (peerIdEl) peerIdEl.textContent = myPeerId;
+
   requestAnimationFrame(() => {
-    setTimeout(() => _initPeerConnection(nick), 0);
+    setTimeout(() => _initPeerConnection(myPeerId), 0);
   });
 }
 
-function _initPeerConnection(nick) {
-  peer = new Peer(nick);
+function _initPeerConnection(peerId) {
+  peer = new Peer(peerId);
   
   callManager = createCallManager({
     peer,
@@ -955,11 +992,18 @@ function wireConnHandlers(conn) {
   });
 }
 
+function requestFriendProfile(peerId) {
+  const conn = activeConnections[peerId];
+  if (!conn?.open) return;
+  conn.send({ type: 'orbit_profile_req', nonce: Date.now() });
+}
+
 function handleOutgoingConnection(conn) {
   conn.on('open', () => {
     activeConnections[conn.peer] = conn;
     scheduleRenderFriends();
     flushOutgoingQueue();
+    requestFriendProfile(conn.peer);
   });
   wireConnHandlers(conn);
 }
@@ -972,6 +1016,7 @@ function handleIncomingConnection(conn) {
       localStorage.setItem('orbit_friends', JSON.stringify(friends));
     }
     scheduleRenderFriends();
+    requestFriendProfile(conn.peer);
   });
   wireConnHandlers(conn);
 }
@@ -1014,33 +1059,58 @@ async function renderFriends() {
   document.getElementById('contacts-empty-state').style.display = 'none';
   
   const previews = await Promise.all(visible.map(f => getLastMessagePreview(chatKey(f.id)).catch(() => null)));
-  
+
+  // Сортируем по времени последнего сообщения (свежие сверху)
+  const indexed = visible.map((f, i) => ({ f, preview: previews[i] }));
+  indexed.sort((a, b) => {
+    const ta = a.preview?.ts || a.f.addedAt || 0;
+    const tb = b.preview?.ts || b.f.addedAt || 0;
+    return tb - ta;
+  });
+
   list.innerHTML = '';
-  visible.forEach((f, i) => {
+  indexed.forEach(({ f, preview: previewObj }) => {
     const isOnline = !!activeConnections[f.id];
-    const preview = previews[i] ? previews[i].text || 'Media' : 'No messages yet';
-    
+    const preview = previewObj ? previewObj.text || 'Media' : 'No messages yet';
+    const profile = friendProfiles[f.id] || {};
+    const displayName = profile.displayName || f.id;
+    const photo = profile.photo || null;
+
     const div = document.createElement('div');
     div.className = 'friend-item';
-    div.onclick = () => openChat(f.id);  // <--- ВОТ ЭТА СТРОКА ПРОБЛЕМНАЯ
-    
-    // ... остальной код
+    div.onclick = () => openChat(f.id);
+
+    const avatarHtml = photo
+      ? `<div class="friend-avatar" style="background-image:url('${escapeAttr(photo)}');background-size:cover;background-position:center;"></div>`
+      : `<div class="friend-avatar">${escapeHtml(displayName.charAt(0).toUpperCase())}</div>`;
+
+    div.innerHTML = `
+      ${avatarHtml}
+      <div style="flex:1;margin-left:12px;overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(displayName)}</strong>
+          <span style="color:${isOnline ? 'var(--tg-online)' : 'var(--tg-offline)'};font-size:12px;margin-left:4px;">${isOnline ? '●' : '○'}</span>
+        </div>
+        <div style="color:var(--tg-text-secondary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(preview)}</div>
+      </div>
+    `;
+    list.appendChild(div);
   });
 }
 function addFriend(id) {
-  if (id === myNickname) return showToast("Cannot add yourself");
-  if (!friends.find(f => f.id === id)) {
-    friends.push({ id, addedAt: Date.now() });
-    localStorage.setItem('orbit_friends', JSON.stringify(friends));
-    tryConnect(id);
-    renderFriends();
-    document.getElementById('add-friend-input').value = '';
-    showToast('Contact added');
-  }
+  const normalized = id.trim().toUpperCase();
+  if (!normalized || normalized.length < 3) return showToast('Invalid ID');
+  if (normalized === myPeerId) return showToast('Cannot add yourself');
+  if (friends.find(f => f.id === normalized)) return showToast('Already in contacts');
+  friends.push({ id: normalized, addedAt: Date.now() });
+  localStorage.setItem('orbit_friends', JSON.stringify(friends));
+  tryConnect(normalized);
+  renderFriends();
+  showToast('Contact added');
 }
 
 function chatKey(friendId = currentChatFriend) {
-  return [myNickname, friendId].sort().join('_');
+  return [myPeerId, friendId].sort().join('_');
 }
 
 function cleanupCurrentView() {
@@ -1062,16 +1132,26 @@ async function openChat(friendId) {
 
   currentChatFriend = friendId;
   document.getElementById('active-chat').style.display = 'flex';
-  document.getElementById('chat-friend-name').textContent = friendId;
-  
+
+  const fp = friendProfiles[friendId] || {};
+  const friendDisplayName = fp.displayName || friendId;
+  document.getElementById('chat-friend-name').textContent = friendDisplayName;
+
   const isOnline = !!activeConnections[friendId];
   document.getElementById('chat-friend-status').textContent = isOnline ? 'online' : 'offline';
   document.getElementById('chat-friend-status').style.color = isOnline ? 'var(--tg-online)' : 'var(--tg-text-secondary)';
-  
-  const avatarColor = friendId.charCodeAt(0) % 8;
+
   const avatarEl = document.getElementById('current-chat-avatar');
-  avatarEl.textContent = friendId.charAt(0).toUpperCase();
-  avatarEl.dataset.color = avatarColor;
+  if (fp.photo) {
+    avatarEl.style.backgroundImage = `url('${fp.photo}')`;
+    avatarEl.style.backgroundSize = 'cover';
+    avatarEl.style.backgroundPosition = 'center';
+    avatarEl.textContent = '';
+  } else {
+    avatarEl.style.backgroundImage = '';
+    avatarEl.textContent = friendDisplayName.charAt(0).toUpperCase();
+    avatarEl.dataset.color = friendId.charCodeAt(0) % 8;
+  }
   
   document.getElementById('app-container').classList.add('chat-open');
   document.getElementById('back-btn').style.display = window.innerWidth <= 768 ? 'flex' : 'none';
@@ -1195,7 +1275,7 @@ function buildMessageElement(msg) {
   }
 
   const div = document.createElement('div');
-  div.className = 'message ' + (msg.from === myNickname ? 'me' : 'them');
+  div.className = 'message ' + (msg.from === myPeerId ? 'me' : 'them');
   if (msg._grouped) div.classList.add('grouped');
   div.dataset.msgTs = String(msg.ts);
 
@@ -1215,9 +1295,9 @@ function buildMessageElement(msg) {
   }
 
   const time = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const statusHtml = msg.from === myNickname ? statusIconHtml(msg.status) : '';
+  const statusHtml = msg.from === myPeerId ? statusIconHtml(msg.status) : '';
   const retryBtn =
-    msg.from === myNickname && msg.type === 'text' && msg.status === 'failed'
+    msg.from === myPeerId && msg.type === 'text' && msg.status === 'failed'
       ? '<button type="button" class="msg-retry tg-link-btn">Retry</button>'
       : '';
 
@@ -1225,7 +1305,7 @@ function buildMessageElement(msg) {
     <div class="msg-body">${contentHtml}</div>
     <div class="msg-meta">
       <span class="msg-time">${time}</span>
-      ${msg.from === myNickname ? `<span class="msg-status">${statusHtml}</span>` : ''}
+      ${msg.from === myPeerId ? `<span class="msg-status">${statusHtml}</span>` : ''}
       ${retryBtn}
     </div>
   `;
@@ -1252,7 +1332,7 @@ async function retryFailedTextMessage(ts) {
       type: 'text',
       text: m.text,
       ts,
-      from: myNickname,
+      from: myPeerId,
       to: currentChatFriend,
       status: 'sent'
     });
@@ -1272,7 +1352,7 @@ async function sendTextMessage(text) {
   if (!currentChatFriend || !text) return;
   touchUserActivity();
   const ts = Date.now();
-  const msg = { type: 'text', text, ts, from: myNickname, to: currentChatFriend, status: 'pending' };
+  const msg = { type: 'text', text, ts, from: myPeerId, to: currentChatFriend, status: 'pending' };
   await saveMsgToDB(chatKey(), msg);
   await mergeMessageIntoView(msg);
   const conn = activeConnections[currentChatFriend];
@@ -1282,7 +1362,7 @@ async function sendTextMessage(text) {
         type: 'text',
         text,
         ts,
-        from: myNickname,
+        from: myPeerId,
         to: currentChatFriend,
         status: 'sent'
       });
@@ -1304,7 +1384,7 @@ function escapeHtml(str) {
 }
 
 async function mergeMessageIntoView(msg) {
-  if (currentChatFriend !== (msg.from === myNickname ? msg.to : msg.from)) return;
+  if (currentChatFriend !== (msg.from === myPeerId ? msg.to : msg.from)) return;
   messageWindow.push(msg);
   trimMessageWindow();
   applyBubbleGrouping();
@@ -1335,15 +1415,23 @@ async function receiveMessage(senderId, data) {
   }
 
   if (data.type === 'orbit_profile_res') {
-    window.dispatchEvent(
-      new CustomEvent('orbit-profile-res', {
-        detail: {
-          from: senderId,
-          nonce: data.nonce,
-          profile: data.profile || {}
+    if (data.profile) {
+      friendProfiles[senderId] = data.profile;
+      localStorage.setItem('orbit_friend_profiles', JSON.stringify(friendProfiles));
+      scheduleRenderFriends();
+      if (currentChatFriend === senderId) {
+        const dn = data.profile.displayName || senderId;
+        document.getElementById('chat-friend-name').textContent = dn;
+        const avatarEl = document.getElementById('current-chat-avatar');
+        if (data.profile.photo) {
+          avatarEl.style.backgroundImage = `url('${data.profile.photo}')`;
+          avatarEl.style.backgroundSize = 'cover';
+          avatarEl.style.backgroundPosition = 'center';
+          avatarEl.textContent = '';
         }
-      })
-    );
+      }
+    }
+    window.dispatchEvent(new CustomEvent('orbit-profile-res', { detail: { from: senderId, nonce: data.nonce, profile: data.profile || {} } }));
     return;
   }
 
@@ -1374,7 +1462,7 @@ async function receiveMessage(senderId, data) {
         ...plain,
         ts: plain.ts || Date.now(),
         from: senderId,
-        to: myNickname,
+        to: myPeerId,
         status: 'delivered'
       };
       await saveMsgToDB(chatKey(senderId), msg);
@@ -1388,10 +1476,18 @@ async function receiveMessage(senderId, data) {
   }
 
   if (data.type === 'text' || data.type === 'image' || data.type === 'audio' || data.type === 'file') {
-    const msg = { ...data, ts: data.ts || Date.now(), from: senderId, to: myNickname, status: 'delivered' };
+    const msg = { ...data, ts: data.ts || Date.now(), from: senderId, to: myPeerId, status: 'delivered' };
     await saveMsgToDB(chatKey(senderId), msg);
     await mergeMessageIntoView(msg);
     scheduleRenderFriends();
+
+    // Уведомление если чат не открыт
+    if (currentChatFriend !== senderId) {
+      const fp = friendProfiles[senderId] || {};
+      const senderName = fp.displayName || senderId;
+      const preview = data.type === 'text' ? (data.text || '').slice(0, 40) : data.type === 'image' ? '📷 Photo' : data.type === 'audio' ? '🎤 Voice' : '📎 File';
+      showToast(`${senderName}: ${preview}`);
+    }
 
     queueDeliveredAck(senderId, msg.ts);
   }
@@ -1436,7 +1532,7 @@ async function sendMediaBlob(file, type, name) {
   reader.onload = async (e) => {
     const buffer = e.target.result;
     const url = arrayBufferToDataUrl(buffer, workFile.type || file.type);
-    const msg = { type, url, name: workName, ts: Date.now(), from: myNickname, to: currentChatFriend, status: 'pending' };
+    const msg = { type, url, name: workName, ts: Date.now(), from: myPeerId, to: currentChatFriend, status: 'pending' };
     await saveMsgToDB(chatKey(), msg);
     await mergeMessageIntoView(msg);
     scheduleRenderFriends();
@@ -1449,7 +1545,7 @@ async function sendMediaBlob(file, type, name) {
           url,
           name: workName,
           ts: msg.ts,
-          from: myNickname,
+          from: myPeerId,
           to: currentChatFriend,
           status: 'sent'
         });
@@ -1905,6 +2001,22 @@ async function flushOutgoingQueue() {
   }
   await dbSetPendingOut([]);
   pendingOutgoing = [];
+}
+
+function openAddFriendModal() {
+  const modal = document.getElementById('add-friend-modal');
+  const peerEl = document.getElementById('my-peer-id-display');
+  if (peerEl) peerEl.textContent = myPeerId;
+  document.getElementById('add-friend-id-input').value = '';
+  modal.style.display = 'flex';
+  modal.removeAttribute('aria-hidden');
+  setTimeout(() => document.getElementById('add-friend-id-input').focus(), 100);
+}
+
+function closeAddFriendModal() {
+  const modal = document.getElementById('add-friend-modal');
+  modal.style.display = 'none';
+  modal.setAttribute('aria-hidden', 'true');
 }
 
 const _doc = typeof document !== 'undefined' ? document : null;
