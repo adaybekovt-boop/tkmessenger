@@ -126,10 +126,6 @@
     </div>
   </div>
 
-  <div id="empty-state">
-    <span>Select a contact to start chatting</span>
-  </div>
-
   <div id="active-chat" style="display:none">
     <div id="chat-header">
       <button id="back-btn" class="tg-icon-btn" style="display:none">
@@ -536,86 +532,6 @@
 
 <script type="module" src="./src/main.js"></script>
 
-<!-- FIX: устранение бага с "Select a contact to start chatting" -->
-<script>
-  (function fixEmptyStateAndChatSync() {
-    // Дожидаемся загрузки DOM и, при необходимости, основной логики
-    function syncPanels() {
-      const activeChat = document.getElementById('active-chat');
-      const emptyState = document.getElementById('empty-state');
-      if (!activeChat || !emptyState) return;
-
-      // Определяем, виден ли чат (не скрыт через style или класс)
-      const isChatVisible = activeChat.style.display !== 'none' &&
-        window.getComputedStyle(activeChat).display !== 'none';
-
-      if (isChatVisible) {
-        // Чат открыт — скрываем пустое состояние
-        if (emptyState.style.display !== 'none') {
-          emptyState.style.display = 'none';
-        }
-      } else {
-        // Чат скрыт — показываем пустое состояние (если нет другого активного окна, например радара)
-        const radarView = document.getElementById('radar-view');
-        const isRadarVisible = radarView && radarView.style.display !== 'none' &&
-          window.getComputedStyle(radarView).display !== 'none';
-
-        if (!isRadarVisible) {
-          if (emptyState.style.display === 'none') {
-            emptyState.style.display = ''; // сброс, чтобы применился CSS по умолчанию
-          }
-        } else {
-          // Если открыт радар — тоже скрываем пустое состояние
-          if (emptyState.style.display !== 'none') {
-            emptyState.style.display = 'none';
-          }
-        }
-      }
-    }
-
-    // Первичная синхронизация
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncPanels);
-    } else {
-      syncPanels();
-    }
-
-    // Следим за изменениями стиля active-chat и появлением других панелей
-    const targetNode = document.getElementById('active-chat');
-    const radarNode = document.getElementById('radar-view');
-    const config = { attributes: true, attributeFilter: ['style', 'class'], subtree: false };
-
-    const observerCallback = function(mutationsList) {
-      for (let mutation of mutationsList) {
-        if (mutation.type === 'attributes' && (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
-          syncPanels();
-          break;
-        }
-      }
-    };
-
-    if (targetNode) {
-      const observer = new MutationObserver(observerCallback);
-      observer.observe(targetNode, config);
-    }
-
-    // Также следим за радаром (если он перекрывает empty-state)
-    if (radarNode) {
-      const radarObserver = new MutationObserver(observerCallback);
-      radarObserver.observe(radarNode, config);
-    }
-
-    // Дополнительно: перехватываем любые клики по элементам, которые могут открывать чат (но не ломаем основную логику)
-    // Это гарантирует синхронизацию даже если основное приложение не вызвало повторную синхронизацию
-    document.body.addEventListener('click', function(e) {
-      // Небольшая задержка, чтобы дать основному обработчику обновить DOM
-      setTimeout(syncPanels, 30);
-    }, true);
-
-    // Периодическая проверка на случай асинхронных изменений (раз в секунду, но лёгкая)
-    setInterval(syncPanels, 1000);
-  })();
-</script>
 
 </body>
 </html>
