@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Orbits P2P</string>
-    <string name="title_activity_main">Orbits P2P</string>
-    <string name="package_name">com.orbits.p2p</string>
-    <string name="custom_url_scheme">com.orbits.p2p</string>
-</resources>
