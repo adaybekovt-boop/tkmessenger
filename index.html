@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta http-equiv="Cache-Control" content="max-age=0, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  
+  <!-- PWA & GitHub Pages Routing Hacks -->
+  <base href="/tkmessenger/">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a1f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Orbits P2P">
+  
+  <!-- GitHub Pages SPA Path Restore Script -->
+  <script>
+    (function(){
+      var redirect = sessionStorage.redirect;
+      delete sessionStorage.redirect;
+      if (redirect && redirect !== location.href) {
+        history.replaceState(null, null, redirect);
+      }
+    })();
+  </script>
+
+  <link rel="icon" href="data:,">
+  <title>Orbits P2P</title>
+  <style>
+    body { margin:0; background:#1a1a1f; color:#e8e8f0;
+           font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+           overflow:hidden; }
+  </style>
+  <link rel="preload" href="./src/styles/style.css" as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="./src/styles/style.css"></noscript>
+  
+  <!-- Register PWA Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js')
+          .then(function(reg) {
+            console.log('[SW] Registered with scope:', reg.scope);
+          }).catch(function(err) {
+            console.log('[SW] Registration failed:', err);
+          });
+      });
+    }
+  </script>
+</head>
+<body>
+
+<canvas id="theme-background" class="theme-background-canvas" width="300" height="150" aria-hidden="true"></canvas>
+
+<div id="login-panel">
+  <div class="login-card" id="login-card">
+    <div class="login-logo" id="login-logo">
+      <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+        <path d="M6 22L38 9L30 35L21 27L13 31L15 22Z" fill="white" opacity="0.92"/>
+        <path d="M21 27L30 18L15 22" fill="white" opacity="0.45"/>
+      </svg>
+    </div>
+    <h2 class="login-title" id="login-title">Orbits P2P</h2>
+    <p class="login-subtitle" id="login-subtitle">Decentralized. Private. Yours.</p>
+
+    <div class="login-inputs" id="login-inputs-wrapper">
+      <div class="tg-field">
+        <input type="text" id="nickname-input" placeholder=" " autocomplete="username">
+        <label for="nickname-input">Your callsign</label>
+      </div>
+      <div class="tg-field">
+        <input type="password" id="password-input" placeholder=" " autocomplete="current-password">
+        <label for="password-input">Master password</label>
+      </div>
+
+      <div class="consent-row">
+        <input type="checkbox" id="privacy-consent">
+        <span>I accept the
+          <button id="open-policy-btn" class="link-btn">Privacy Policy</button>
+        </span>
+      </div>
+    </div>
+
+    <button id="login-btn" class="tg-primary-btn" disabled>Join network</button>
+  </div>
+</div>
+
+<div id="app-container" style="display:none">
+
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <button id="open-settings-btn" class="tg-icon-btn" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <rect y="3" width="20" height="2" rx="1"/>
+          <rect y="9" width="20" height="2" rx="1"/>
+          <rect y="15" width="20" height="2" rx="1"/>
+        </svg>
+      </button>
+      <div class="sidebar-search-wrap">
+        <svg class="sidebar-search-icon" width="15" height="15" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input class="sidebar-search-input" type="text" placeholder="Search"
+               id="add-friend-input">
+      </div>
+      <button id="open-add-friend-btn" class="tg-icon-btn" aria-label="Add Friend" title="Add Friend">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="8.5" cy="7" r="4"/>
+          <line x1="20" y1="8" x2="20" y2="14"/>
+          <line x1="23" y1="11" x2="17" y2="11"/>
+        </svg>
+      </button>
+      <button id="add-friend-btn" style="display:none">+</button>
+    </div>
+
+    <div id="friends-list"></div>
+    <div id="contacts-empty-state" class="contacts-empty-placeholder" style="display:none">
+      No contacts yet. Tap the person+ button to add friends.
+    </div>
+
+    <div id="my-profile">
+      <div class="friend-avatar" id="my-avatar-letter">Me</div>
+      <div class="my-info">
+        <span id="my-id-display">Loading...</span>
+        <span id="my-status" class="status-online">Online</span>
+      </div>
+    </div>
+
+    <div id="bottom-nav" role="navigation">
+      <button id="bottom-chats-btn" class="nav-btn active">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/>
+        </svg>
+        Chats
+      </button>
+      <button id="bottom-contacts-btn" class="nav-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Contacts
+      </button>
+      <button id="bottom-radar-btn" class="nav-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="2"/>
+          <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>
+        </svg>
+        Radar
+      </button>
+      <button id="bottom-settings-btn" class="nav-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        Settings
+      </button>
+    </div>
+  </div>
+
+  <div id="active-chat" style="display:none">
+    <div id="chat-header">
+      <button id="back-btn" class="tg-icon-btn" style="display:none">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M19 12H5M12 5l-7 7 7 7"/>
+        </svg>
+      </button>
+      <div class="chat-header-info">
+        <div id="current-chat-avatar" class="chat-avatar"></div>
+        <div class="chat-header-text">
+          <span id="chat-friend-name"></span>
+          <span id="chat-friend-status"></span>
+        </div>
+      </div>
+      <div class="chat-header-actions">
+        <span id="trust-badge" class="trust-badge trust-neutral" style="display:none">Shield: ?</span>
+        
+        <!-- TITANIUM FIX: Nudge Button -->
+        <button id="nudge-btn" class="tg-icon-btn" title="Nudge / Shake">
+          <span style="font-size: 16px;">📳</span>
+        </button>
+
+        <!-- TITANIUM FIX: Watch Party Button -->
+        <button id="cinema-btn" class="tg-icon-btn" title="Watch Party">
+          <span style="font-size: 16px;">🍿</span>
+        </button>
+
+        <button id="screen-btn" class="tg-icon-btn" title="Screen share">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+        </button>
+        <button id="audio-call-btn" class="tg-icon-btn" title="Voice call">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 6.29 6.29l1.62-1.62a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </button>
+        <button id="call-btn" class="tg-icon-btn" title="Video call">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+        </button>
+        <button id="report-peer-btn" class="tg-icon-btn" title="More">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="chat-warning-banner" style="display:none"></div>
+
+    <div id="messages-list"></div>
+
+    <div id="chat-input-area" class="chat-input-box">
+      <button id="file-btn" class="tg-icon-btn" aria-label="Attach">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+      <input type="file" id="file-input" hidden>
+      <textarea id="chat-input" rows="1" placeholder="Message..."></textarea>
+      <select id="ttl-select" title="Message lifetime">
+        <option value="0">∞</option>
+        <option value="30000">30s</option>
+        <option value="60000">1m</option>
+        <option value="3600000">1h</option>
+      </select>
+      <button id="send-voice-btn" class="tg-send-btn voice-mode">
+        <span id="mic-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+          </svg>
+        </span>
+        <span id="send-icon" style="display:none">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </div>
+
+<!-- Orbits Drop Hidden File Input -->
+<input type="file" id="orbits-drop-input" style="display:none;" />
+
+<!-- Orbits Drop Quality Modal -->
+<div class="modal-overlay" id="drop-quality-modal" aria-hidden="true" style="display:none;">
+  <div class="modal-card drop-quality-card">
+    <div class="modal-header">
+      <h3 class="modal-title">Orbits Drop</h3>
+      <button class="icon-btn close-modal-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <div class="modal-content">
+      <p class="drop-hint">Select image compression quality to save bandwidth during P2P transfer.</p>
+      
+      <div class="drop-quality-options">
+        <label class="drop-option">
+          <input type="radio" name="drop_quality" value="original" checked>
+          <div class="option-content">
+            <span class="option-title">Original Quality</span>
+            <span class="option-desc">No compression, exact file match</span>
+          </div>
+        </label>
+        
+        <label class="drop-option">
+          <input type="radio" name="drop_quality" value="high">
+          <div class="option-content">
+            <span class="option-title">High Quality</span>
+            <span class="option-desc">Slight compression, max 1920px</span>
+          </div>
+        </label>
+        
+        <label class="drop-option">
+          <input type="radio" name="drop_quality" value="fast">
+          <div class="option-content">
+            <span class="option-title">Fast (Compressed)</span>
+            <span class="option-desc">Max compression for mobile data</span>
+          </div>
+        </label>
+      </div>
+      
+      <div class="modal-actions" style="margin-top: 20px;">
+        <button class="btn btn-secondary close-modal-btn">Cancel</button>
+        <button class="btn btn-primary" id="drop-send-btn">Send File</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- TITANIUM FIX: Cinema View (Watch Party Mode) -->
+<div id="cinema-view" style="display:none;" aria-hidden="true">
+  <div class="cinema-header">
+    <button class="icon-btn" id="close-cinema-btn" aria-label="Exit Cinema Mode">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="cinema-title">Watch Party <span id="cinema-friend-name" style="opacity: 0.7; font-weight: normal; margin-left: 8px;"></span></div>
+    
+    <div class="cinema-controls">
+      <button id="cinema-mic-btn" class="icon-btn" title="Toggle Microphone">
+        <svg id="cinema-mic-on" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+        <svg id="cinema-mic-off" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none; color: var(--tg-text-danger)"><path d="M19 11v-1h-2v1c0 1.57-.64 3-1.68 4.03l1.43 1.43A8.93 8.93 0 0 0 19 11zM10.15 13.91a2.98 2.98 0 0 1-1.15-2.91V6c0-1.66 1.34-3 3-3 1.35 0 2.48.88 2.86 2.11L10.15 13.91zM4.27 3L3 4.27l5.96 5.96A3.01 3.01 0 0 0 9 11v1c0 2.76 2.24 5 5 5 .34 0 .68-.04 1.01-.1l4.72 4.72 1.27-1.27L4.27 3zM12 19c-3.53 0-6.43-2.61-6.92-6H3.08c.49 4.33 4.14 7.82 8.92 8.08V24h2v-2.92c.69-.04 1.35-.17 1.98-.37l-1.52-1.52c-.15.03-.3.05-.46.05z"/></svg>
+      </button>
+      <label for="cinema-file-input" class="tg-primary-btn" style="padding: 6px 12px; cursor: pointer; font-size: 13px;">
+        Choose Local Video
+      </label>
+      <input type="file" id="cinema-file-input" accept="video/*" style="display: none;">
+    </div>
+  </div>
+  
+  <div class="cinema-player-container">
+    <div id="cinema-empty-state" class="cinema-empty">
+      <div style="font-size: 48px; margin-bottom: 16px;">🍿</div>
+      <h3>Watch Party</h3>
+      <p style="color: var(--tg-text-secondary); max-width: 400px; text-align: center; line-height: 1.5;">
+        Both you and your friend need to select the same video file from your devices. 
+        Orbits will automatically sync play, pause, and seeking in real-time.
+      </p>
+    </div>
+    <video id="cinema-video" controls playsinline style="display:none;"></video>
+  </div>
+</div>
+    <div class="radar-container">
+      <canvas id="radar-canvas" width="280" height="280" aria-hidden="true"></canvas>
+      <p class="radar-hint">Online friends (connected). Optional prefix filter: <code>orbit_radar_prefix</code> in localStorage.</p>
+      <button type="button" id="radar-scan-btn" class="tg-primary-btn radar-scan-btn">Scan</button>
+      <p id="radar-status" class="radar-status-line" role="status"></p>
+      <div id="radar-results-list" class="radar-results-list"></div>
+      <div class="radar-manual-row">
+        <input type="text" id="radar-manual-id" class="radar-manual-input" placeholder="Peer ID (manual lookup)" autocomplete="off" maxlength="64">
+        <button type="button" id="radar-lookup-btn" class="tg-primary-btn radar-lookup-btn">Lookup</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TITANIUM FIX: PILLAR 2 - Settings View (Tabbed Interface) -->
+<div id="settings-view" style="display:none;" aria-hidden="true">
+  <div class="settings-header">
+    <button id="close-settings-btn" class="tg-icon-btn" title="Back">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+    </button>
+    <span class="settings-title-text">Settings</span>
+    <button id="save-settings-btn" class="tg-icon-btn" style="color:var(--tg-accent)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </button>
+  </div>
+  
+  <div class="settings-tabs-nav">
+    <button class="tab-btn active" data-tab="tab-profile">Profile</button>
+    <button class="tab-btn" data-tab="tab-appearance">Appearance</button>
+    <button class="tab-btn" data-tab="tab-media">Audio & Video</button>
+    <button class="tab-btn" data-tab="tab-security">Security</button>
+  </div>
+
+  <div class="settings-body">
+    
+    <!-- Profile Tab -->
+    <div id="tab-profile" class="settings-tab-content active">
+      <div class="settings-section-title">My Profile</div>
+      <div id="profile-photos-grid" class="profile-photos-grid">
+        <div class="profile-photo-item profile-photo-add" id="profile-add-photo-btn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </div>
+      </div>
+      <input type="file" id="profile-photo-input" accept="image/*" hidden>
+      <div class="settings-row">
+        <span class="settings-row-label">Display name</span>
+        <input type="text" id="settings-display-name" placeholder="Optional name" maxlength="32">
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Bio</span>
+        <textarea id="settings-bio" placeholder="About you..." maxlength="150" rows="2"></textarea>
+      </div>
+    </div>
+
+    <!-- Appearance Tab -->
+    <div id="tab-appearance" class="settings-tab-content">
+      <div class="settings-section-title">Themes (Pillar 5)</div>
+      <div class="theme-presets-grid">
+        <button type="button" class="theme-preset-btn" data-theme="matrix">
+          <span class="theme-preview" style="background:#000;border:1px solid #00FF41"></span>
+          <span class="theme-label">Matrix (Default)</span>
+        </button>
+        <button type="button" class="theme-preset-btn" data-theme="sakura_zen">
+          <span class="theme-preview" style="background:linear-gradient(135deg,#140a0e,#ffb7c5)"></span>
+          <span class="theme-label">Sakura Zen</span>
+        </button>
+        <button type="button" class="theme-preset-btn" data-theme="aurora_flow">
+          <span class="theme-preview" style="background:linear-gradient(135deg,#0a0a12,#00E5FF)"></span>
+          <span class="theme-label">Aurora Flow</span>
+        </button>
+        <button type="button" class="theme-preset-btn" data-theme="retro_synth">
+          <span class="theme-preview" style="background:linear-gradient(180deg,#140a18,#FF00FF)"></span>
+          <span class="theme-label">Retro Synth</span>
+        </button>
+        <button type="button" class="theme-preset-btn" data-theme="obsidian">
+          <span class="theme-preview" style="background:#000000"></span>
+          <span class="theme-label">Obsidian</span>
+        </button>
+      </div>
+      
+      <div class="settings-section-title">Motion & Density</div>
+      <div class="settings-row">
+        <span class="settings-row-label">Reduce UI Animations</span>
+        <label class="tg-toggle"><input type="checkbox" id="reduce-animations-toggle">
+          <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Text size</span>
+        <div class="appearance-size-picker">
+          <button class="size-btn" data-size="small">A</button>
+          <button class="size-btn active" data-size="medium">A</button>
+          <button class="size-btn" data-size="large">A</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Media Tab -->
+    <div id="tab-media" class="settings-tab-content">
+      <div class="settings-section-title">Audio & Video</div>
+      <div class="settings-row">
+        <span class="settings-row-label">Mic device</span>
+        <select id="mic-device-select"></select>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Echo cancellation</span>
+        <label class="tg-toggle"><input type="checkbox" id="echo-cancel-toggle" checked>
+          <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Noise suppression</span>
+        <label class="tg-toggle"><input type="checkbox" id="noise-suppression-toggle" checked>
+          <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Auto gain</span>
+        <label class="tg-toggle"><input type="checkbox" id="auto-gain-toggle" checked>
+          <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Video quality</span>
+        <select id="video-quality-select">
+          <option value="low">Low (15fps)</option>
+          <option value="medium" selected>Medium (24fps)</option>
+          <option value="high">High (30fps HD)</option>
+        </select>
+      </div>
+      <button id="test-mic-btn" class="settings-btn settings-btn-default">Test microphone</button>
+      <button id="stop-mic-test-btn" class="settings-btn settings-btn-default" style="display:none">Stop test</button>
+      <div id="mic-level-bar" style="height:4px;background:var(--tg-accent);width:0%;margin:0 16px;border-radius:2px;transition:width 0.1s"></div>
+    </div>
+
+    <!-- Security Tab -->
+    <div id="tab-security" class="settings-tab-content">
+      <div class="settings-section-title">Network & Performance</div>
+      <div class="settings-row">
+        <span class="settings-row-label">Data saver</span>
+        <label class="tg-toggle"><input type="checkbox" id="data-saver-toggle">
+          <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Battery saver</span>
+        <label class="tg-toggle"><input type="checkbox" id="battery-saver-toggle">
+          <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+      </div>
+
+      <div class="settings-section-title">Privacy</div>
+      <div class="settings-row">
+        <span class="settings-row-label">Typing indicator</span>
+        <label class="tg-toggle"><input type="checkbox" id="typing-indicator-toggle" checked>
+          <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Allow screenshots</span>
+        <label class="tg-toggle"><input type="checkbox" id="allow-screenshots-toggle">
+          <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+      </div>
+      <div class="settings-row">
+        <span class="settings-row-label">Duress password</span>
+        <input type="password" id="duress-password-input" placeholder="Min 6 chars">
+      </div>
+      <button id="panic-wipe-btn" class="settings-btn settings-btn-danger">Wipe all local data</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Group Modal -->
+<div id="create-group-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">New Group</h3>
+    <div class="tg-field">
+      <input type="text" id="group-name-input" placeholder=" " maxlength="32">
+      <label for="group-name-input">Group name</label>
+    </div>
+    <div id="group-members-list" class="group-members-list"></div>
+    <p style="font-size:12px;color:var(--tg-text-hint);margin:8px 0">Max 8 members</p>
+    <button id="confirm-create-group-btn" class="tg-primary-btn">Create Group</button>
+    <button id="cancel-create-group-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Cancel</button>
+  </div>
+</div>
+
+<!-- Policy Modal -->
+<div id="policy-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Privacy Policy</h3>
+    <div id="policy-scrollbox" class="tg-modal-text">
+      <p><strong>Zero server storage:</strong> Orbits does not store your messages,
+      keys, or media on centralized servers.</p>
+      <p><strong>Local control:</strong> Chat history is stored locally on your device.</p>
+      <p><strong>Responsibility:</strong> If you lose your password, access cannot be
+      restored — there is no centralized recovery.</p>
+      <p><strong>Technical logs:</strong> Only technical metadata is used to establish
+      P2P connections (node ID, NAT type).</p>
+    </div>
+    <button id="accept-policy-btn" class="tg-primary-btn">Accept and continue</button>
+    <button id="close-policy-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<!-- Report Modal -->
+<div id="report-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Report user</h3>
+    <p class="tg-modal-text">Select a reason. The user will be blocked locally.</p>
+    <label style="display:block;padding:8px 0"><input type="radio" name="report-reason" value="spam" checked> Spam</label>
+    <label style="display:block;padding:8px 0"><input type="radio" name="report-reason" value="fraud"> Fraud</label>
+    <label style="display:block;padding:8px 0"><input type="radio" name="report-reason" value="abuse"> Abuse</label>
+    <button id="submit-report-btn" class="settings-btn settings-btn-danger">Report and block</button>
+    <button id="close-report-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Cancel</button>
+  </div>
+</div>
+
+<!-- Vault Lock Modal -->
+<div id="vault-lock-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Session locked</h3>
+    <p class="tg-modal-text">The app was minimized for over 5 minutes. Enter your master password.</p>
+    <div class="tg-field">
+      <input type="password" id="unlock-password-input" placeholder=" ">
+      <label>Master password</label>
+    </div>
+    <button id="unlock-vault-btn" class="tg-primary-btn">Unlock</button>
+  </div>
+</div>
+
+<!-- Incoming Call Modal -->
+<div id="incoming-call-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card" style="text-align:center">
+    <h3 class="tg-modal-title" id="caller-name">Incoming call</h3>
+    <p class="tg-modal-text" id="call-type-label">is calling...</p>
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:16px">
+      <button id="reject-call-btn" class="settings-btn settings-btn-danger" style="flex:1">Decline</button>
+      <button id="accept-call-btn" class="tg-primary-btn" style="flex:1">Accept</button>
+    </div>
+  </div>
+</div>
+
+<!-- Call Screen -->
+<div id="call-screen" style="display:none">
+  <div class="call-container">
+    <video id="remote-video" autoplay playsinline></video>
+    <video id="local-video" autoplay playsinline muted></video>
+    <div class="call-info">
+      <div id="call-user-name"></div>
+      <div id="call-status">Calling...</div>
+    </div>
+    <div class="call-controls">
+      <button id="call-toggle-audio" class="tg-icon-btn call-btn" title="Mute">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        </svg>
+      </button>
+      <button id="call-toggle-video" class="tg-icon-btn call-btn" title="Camera">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="23 7 16 12 23 17 23 7"/>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+        </svg>
+      </button>
+      <button id="call-screen-share-btn" class="tg-icon-btn call-btn" title="Share Screen">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8M12 17v4"/>
+        </svg>
+      </button>
+      <button id="end-call-btn" class="tg-icon-btn call-btn call-end" title="End Call">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6.5-6.5A19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56"/>
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Nearby Peer Modal -->
+<div id="nearby-peer-modal" style="display:none">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Nearby peer</h3>
+    <p class="tg-modal-text">ID: <strong id="nearby-peer-id"></strong></p>
+    <p class="tg-modal-text" id="nearby-peer-name-row" hidden>Name: <span id="nearby-peer-displayname"></span></p>
+    <p class="tg-modal-text"><span id="nearby-peer-trust" class="trust-badge trust-neutral" style="display:none"></span></p>
+    <button type="button" id="nearby-send-btn" class="tg-primary-btn">Send Message</button>
+    <button id="nearby-add-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Add to Contacts</button>
+    <button id="nearby-close-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<!-- Add Contact Modal -->
+<div id="add-friend-modal" style="display:none" aria-hidden="true">
+  <div class="tg-modal-card">
+    <h3 class="tg-modal-title">Add Contact</h3>
+    <p class="tg-modal-text" style="font-size:13px;margin-bottom:8px;color:var(--tg-text-secondary)">Your ID — share it with friends:</p>
+    <div style="display:flex;align-items:center;gap:8px;background:var(--tg-bg-input);border-radius:10px;padding:10px 14px;margin-bottom:16px;">
+      <code id="my-peer-id-display" style="flex:1;font-family:monospace;font-size:16px;letter-spacing:2px;color:var(--tg-accent);font-weight:bold"></code>
+      <button id="copy-my-id-btn" class="tg-icon-btn" title="Copy ID" style="width:32px;height:32px;flex-shrink:0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      </button>
+    </div>
+    <div class="tg-field">
+      <input type="text" id="add-friend-id-input" placeholder=" " autocomplete="off" maxlength="9" style="text-transform:uppercase;letter-spacing:1px">
+      <label for="add-friend-id-input">Friend's ID</label>
+    </div>
+    <button id="confirm-add-friend-btn" class="tg-primary-btn">Add Contact</button>
+    <button id="close-add-friend-modal-btn" class="settings-btn settings-btn-default" style="margin-top:8px">Cancel</button>
+  </div>
+</div>
+
+<!-- Theme Customizer Modal -->
+<div id="theme-customizer-modal" style="display:none" aria-hidden="true">
+  <div class="settings-header">
+    <button id="close-theme-customizer-btn" class="tg-icon-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+    </button>
+    <span class="settings-title-text">Настройка темы</span>
+  </div>
+  <div class="settings-body">
+    <div class="settings-section-title">Цвета</div>
+    <div class="settings-row">
+      <span class="settings-row-label">Основной акцент</span>
+      <input type="color" id="custom-theme-accent" value="#5b9bd5">
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Фон (основной)</span>
+      <input type="color" id="custom-theme-bg-primary" value="#25252c">
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Фон (вторичный)</span>
+      <input type="color" id="custom-theme-bg-secondary" value="#1a1a1f">
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Фон (ввод)</span>
+      <input type="color" id="custom-theme-bg-input" value="#2e2e36">
+    </div>
+    
+    <div class="settings-section-title">Производительность</div>
+    <div class="settings-row">
+      <span class="settings-row-label">Сбережение нагрузки<br><small style="color:var(--tg-text-hint);font-size:11px">Уменьшает анимации на 50%</small></span>
+      <label class="tg-toggle"><input type="checkbox" id="reduce-animations-toggle">
+        <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
+    </div>
+    
+    <button id="apply-custom-theme-btn" class="settings-btn settings-btn-default" style="background:var(--tg-accent);color:#fff;margin-top:24px;">Применить</button>
+    <button id="reset-custom-theme-btn" class="settings-btn settings-btn-danger">Сбросить цвета</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+
+
+</body>
+</html>
