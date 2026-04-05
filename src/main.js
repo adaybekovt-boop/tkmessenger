@@ -3,7 +3,6 @@ import { registerSW } from 'virtual:pwa-register';
 import { dbInit, dbGetPage, dbGetLast, dbAdd, dbUpdateStatus, dbDelete, dbClearAll, dbGetPendingOut, dbSetPendingOut } from './core/db.js';
 import { cryptoDerive, cryptoLock, cryptoEncrypt, cryptoDecrypt, cryptoDecryptBatch, cryptoSha256Hex, cryptoPbkdf2Bytes } from './core/crypto.js';
 import { bytesToBase64 } from './core/base64.js';
-import { fileSha256Buffer } from './core/file.js';
 import { VirtualScroller } from './ui/virtualScroll.js';
 import { createCallManager } from './core/callManager.js';
 import { getThemeManager } from './ui/themeManager.js';
@@ -12,9 +11,12 @@ import { showToast } from './ui/toast.js';
 import { encryptWirePayload, decryptWirePayload, initWireSession, acceptWireHello, getWireSessionStatus, waitForWireReady, teardownWireSession } from './core/wireCrypto.js';
 import { optimizer } from './core/optimizer.js';
 import { OrbitsDrop } from './core/orbitsDrop.js';
+import { initI18n } from './ui/i18n.js';
 
 // TITANIUM FIX: Initialize OrbitsDrop Module
 const orbitsDrop = new OrbitsDrop();
+
+const i18n = initI18n();
 
 // Setup OrbitsDrop UI and Callbacks
 orbitsDrop.onProgressUpdate = (msgId, percent, statusText) => {
@@ -238,12 +240,14 @@ let orbitProfile = { photos: [], displayName: '', ...JSON.parse(localStorage.get
     colorScheme: 'default',
     bio: '',
     reduceAnimations: false,
-    customThemeColors: null
+    customThemeColors: null,
+    themeMaxFps: 0,
+    themeWindStrength: 1.15
   };
 let appSettings = { ...defaultSettings, ...JSON.parse(localStorage.getItem('orbit_settings') || '{}') };
 (() => {
   const appearance = JSON.parse(localStorage.getItem('orbit_appearance') || '{}');
-  for (const k of ['textSize', 'density', 'bubbleStyle', 'colorScheme', 'reduceAnimations', 'customThemeColors']) {
+  for (const k of ['textSize', 'density', 'bubbleStyle', 'colorScheme', 'reduceAnimations', 'customThemeColors', 'themeMaxFps', 'themeWindStrength']) {
     if (appearance[k] != null) appSettings[k] = appearance[k];
   }
 })();
@@ -585,7 +589,9 @@ function applyOptimizerRuntime() {
     tm.setBatterySaverHold(true);
   } else {
     tm.setBatterySaverHold(false);
+    tm.setMaxFPS(Number(appSettings.themeMaxFps || 0));
   }
+  tm.setThemeParams({ windStrength: Number(appSettings.themeWindStrength || 1.15) });
 }
 
 function attachNetworkDataSaverListener() {
@@ -916,6 +922,11 @@ function wireAppearanceControls() {
       document.getElementById('custom-theme-bg-input').value = appSettings.customThemeColors?.bgInput || rootStyles.getPropertyValue('--tg-bg-input').trim();
       const rm = document.getElementById('reduce-animations-toggle-customizer');
       if (rm) rm.checked = appSettings.reduceAnimations || false;
+
+      const fps = document.getElementById('theme-fps-range');
+      if (fps) fps.value = String(Math.max(0, Math.min(60, Number(appSettings.themeMaxFps || 0))));
+      const wind = document.getElementById('theme-wind-range');
+      if (wind) wind.value = String(Math.max(60, Math.min(180, Math.round(Number(appSettings.themeWindStrength || 1.15) * 100))));
       
       customizerModal.style.display = 'flex';
       requestAnimationFrame(() => customizerModal.removeAttribute('aria-hidden'));
@@ -940,6 +951,15 @@ function wireAppearanceControls() {
       };
       const rm = document.getElementById('reduce-animations-toggle-customizer');
       appSettings.reduceAnimations = rm ? rm.checked : !!appSettings.reduceAnimations;
+
+      const fps = document.getElementById('theme-fps-range');
+      appSettings.themeMaxFps = fps ? Number(fps.value || 0) : Number(appSettings.themeMaxFps || 0);
+      const wind = document.getElementById('theme-wind-range');
+      appSettings.themeWindStrength = wind ? Number(wind.value || 115) / 100 : Number(appSettings.themeWindStrength || 1.15);
+
+      const tm = getThemeManager();
+      tm.setMaxFPS(appSettings.themeMaxFps);
+      tm.setThemeParams({ windStrength: appSettings.themeWindStrength });
       applyAppearanceSettings();
       saveSettings();
       showToast('Theme updated!');
@@ -952,6 +972,11 @@ function wireAppearanceControls() {
   if (resetCustomThemeBtn) {
     resetCustomThemeBtn.addEventListener('click', () => {
       appSettings.customThemeColors = null;
+      appSettings.themeMaxFps = 0;
+      appSettings.themeWindStrength = 1.15;
+      const tm = getThemeManager();
+      tm.setMaxFPS(0);
+      tm.setThemeParams({ windStrength: 1.15 });
       applyAppearanceSettings();
       saveSettings();
       showToast('Theme reset!');
@@ -1010,6 +1035,7 @@ function triggerLocalNudge() {
 
 function initAppChrome() {
   applyBootClasses();
+  i18n.apply(document);
   registerPwaIfEligible();
   applyAppearanceSettings();
   optimizer.init({
@@ -1049,6 +1075,23 @@ function initAppChrome() {
   wireProfileSection();
   wireGroupModal();
   setupRadarIntegration();
+
+  const langEnBtn = document.getElementById('lang-en-btn');
+  const langRuBtn = document.getElementById('lang-ru-btn');
+  const setLangActive = () => {
+    const lang = i18n.getLang();
+    if (langEnBtn) langEnBtn.classList.toggle('active', lang === 'en');
+    if (langRuBtn) langRuBtn.classList.toggle('active', lang === 'ru');
+  };
+  setLangActive();
+  [langEnBtn, langRuBtn].forEach((btn) => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.lang;
+      i18n.setLang(next);
+      setLangActive();
+    });
+  });
   
   const loginBtn = document.getElementById('login-btn');
   const nickInput = document.getElementById('nickname-input');
@@ -2882,7 +2925,9 @@ function saveSettings() {
       bubbleStyle: appSettings.bubbleStyle,
       colorScheme: appSettings.colorScheme,
       reduceAnimations: appSettings.reduceAnimations,
-      customThemeColors: appSettings.customThemeColors
+      customThemeColors: appSettings.customThemeColors,
+      themeMaxFps: appSettings.themeMaxFps,
+      themeWindStrength: appSettings.themeWindStrength
     })
   );
   applyOptimizerRuntime();

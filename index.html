@@ -36,28 +36,28 @@
         <path d="M21 27L30 18L15 22" fill="white" opacity="0.45"/>
       </svg>
     </div>
-    <h2 class="login-title" id="login-title">Orbits P2P</h2>
-    <p class="login-subtitle" id="login-subtitle">Decentralized. Private. Yours.</p>
+    <h2 class="login-title" id="login-title" data-i18n="login.title">Orbits P2P</h2>
+    <p class="login-subtitle" id="login-subtitle" data-i18n="login.subtitle">Decentralized. Private. Yours.</p>
 
     <div class="login-inputs" id="login-inputs-wrapper">
       <div class="tg-field">
         <input type="text" id="nickname-input" placeholder=" " autocomplete="username">
-        <label for="nickname-input">Your callsign</label>
+        <label for="nickname-input" data-i18n="login.callsign">Your callsign</label>
       </div>
       <div class="tg-field">
         <input type="password" id="password-input" placeholder=" " autocomplete="current-password">
-        <label for="password-input">Master password</label>
+        <label for="password-input" data-i18n="login.password">Master password</label>
       </div>
 
       <div class="consent-row">
         <input type="checkbox" id="privacy-consent">
-        <span>I accept the
-          <button id="open-policy-btn" class="link-btn">Privacy Policy</button>
+        <span><span data-i18n="login.accept">I accept the</span>
+          <button id="open-policy-btn" class="link-btn" data-i18n="login.policy">Privacy Policy</button>
         </span>
       </div>
     </div>
 
-    <button id="login-btn" class="tg-primary-btn" disabled>Join network</button>
+    <button id="login-btn" class="tg-primary-btn" disabled data-i18n="login.join">Join network</button>
   </div>
 </div>
 
@@ -113,13 +113,13 @@
     </div>
 
     <div id="bottom-nav" role="navigation">
-      <button id="bottom-chats-btn" class="nav-btn active">
+      <button id="bottom-chats-btn" class="nav-btn active" data-i18n="nav.chats">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/>
         </svg>
         Chats
       </button>
-      <button id="bottom-contacts-btn" class="nav-btn">
+      <button id="bottom-contacts-btn" class="nav-btn" data-i18n="nav.contacts">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
@@ -127,14 +127,14 @@
         </svg>
         Contacts
       </button>
-      <button id="bottom-radar-btn" class="nav-btn">
+      <button id="bottom-radar-btn" class="nav-btn" data-i18n="nav.radar">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="2"/>
           <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>
         </svg>
         Radar
       </button>
-      <button id="bottom-settings-btn" class="nav-btn">
+      <button id="bottom-settings-btn" class="nav-btn" data-i18n="nav.settings">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -212,7 +212,7 @@
         </svg>
       </button>
       <input type="file" id="file-input" hidden>
-      <textarea id="chat-input" rows="1" placeholder="Message..."></textarea>
+      <textarea id="chat-input" rows="1" placeholder="Message..." data-i18n-placeholder="chat.placeholder"></textarea>
       <select id="ttl-select" title="Message lifetime">
         <option value="0">∞</option>
         <option value="30000">30s</option>
@@ -242,44 +242,44 @@
 <!-- Orbits Drop Quality Modal -->
 <div class="modal-overlay" id="drop-quality-modal" aria-hidden="true" style="display:none;">
   <div class="modal-card drop-quality-card">
-    <div class="modal-header">
-      <h3 class="modal-title">Orbits Drop</h3>
+  <div class="modal-header">
+      <h3 class="modal-title" data-i18n="drop.title">Orbits Drop</h3>
       <button class="icon-btn close-modal-btn" aria-label="Close">
         <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>
     </div>
     <div class="modal-content">
-      <p class="drop-hint">Select image compression quality to save bandwidth during P2P transfer.</p>
+      <p class="drop-hint" data-i18n="drop.hint">Select image compression quality to save bandwidth during P2P transfer.</p>
       
       <div class="drop-quality-options">
         <label class="drop-option">
           <input type="radio" name="drop_quality" value="original" checked>
           <div class="option-content">
-            <span class="option-title">Original Quality</span>
-            <span class="option-desc">No compression, exact file match</span>
+            <span class="option-title" data-i18n="drop.original.title">Original Quality</span>
+            <span class="option-desc" data-i18n="drop.original.desc">No compression, exact file match</span>
           </div>
         </label>
         
         <label class="drop-option">
           <input type="radio" name="drop_quality" value="high">
           <div class="option-content">
-            <span class="option-title">High Quality</span>
-            <span class="option-desc">Slight compression, max 1920px</span>
+            <span class="option-title" data-i18n="drop.high.title">High Quality</span>
+            <span class="option-desc" data-i18n="drop.high.desc">Slight compression, max 1920px</span>
           </div>
         </label>
         
         <label class="drop-option">
           <input type="radio" name="drop_quality" value="fast">
           <div class="option-content">
-            <span class="option-title">Fast (Compressed)</span>
-            <span class="option-desc">Max compression for mobile data</span>
+            <span class="option-title" data-i18n="drop.fast.title">Fast (Compressed)</span>
+            <span class="option-desc" data-i18n="drop.fast.desc">Max compression for mobile data</span>
           </div>
         </label>
       </div>
       
       <div class="modal-actions" style="margin-top: 20px;">
-        <button class="btn btn-secondary close-modal-btn">Cancel</button>
-        <button class="btn btn-primary" id="drop-send-btn">Send File</button>
+        <button class="btn btn-secondary close-modal-btn" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary" id="drop-send-btn" data-i18n="drop.send">Send</button>
       </div>
     </div>
   </div>
@@ -342,7 +342,7 @@
         <path d="M19 12H5M12 5l-7 7 7 7"/>
       </svg>
     </button>
-    <span class="settings-title-text">Settings</span>
+    <span class="settings-title-text" data-i18n="settings.title">Settings</span>
     <button id="save-settings-btn" class="tg-icon-btn" style="color:var(--tg-accent)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <polyline points="20 6 9 17 4 12"/>
@@ -351,17 +351,18 @@
   </div>
   
   <div class="settings-tabs-nav">
-    <button class="tab-btn active" data-tab="tab-profile">Profile</button>
-    <button class="tab-btn" data-tab="tab-appearance">Appearance</button>
-    <button class="tab-btn" data-tab="tab-media">Audio & Video</button>
-    <button class="tab-btn" data-tab="tab-security">Security</button>
+    <button class="tab-btn active" data-tab="tab-profile" data-i18n="settings.tab.profile">Profile</button>
+    <button class="tab-btn" data-tab="tab-appearance" data-i18n="settings.tab.appearance">Appearance</button>
+    <button class="tab-btn" data-tab="tab-media" data-i18n="settings.tab.media">Audio & Video</button>
+    <button class="tab-btn" data-tab="tab-security" data-i18n="settings.tab.security">Security</button>
+    <button class="tab-btn" data-tab="tab-languages" data-i18n="settings.tab.languages">Languages</button>
   </div>
 
   <div class="settings-body">
     
     <!-- Profile Tab -->
     <div id="tab-profile" class="settings-tab-content active">
-      <div class="settings-section-title">My Profile</div>
+      <div class="settings-section-title" data-i18n="settings.profile.title">My Profile</div>
       <div id="profile-photos-grid" class="profile-photos-grid">
         <div class="profile-photo-item profile-photo-add" id="profile-add-photo-btn">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -371,50 +372,50 @@
       </div>
       <input type="file" id="profile-photo-input" accept="image/*" hidden>
       <div class="settings-row">
-        <span class="settings-row-label">Display name</span>
+        <span class="settings-row-label" data-i18n="settings.profile.displayName">Display name</span>
         <input type="text" id="settings-display-name" placeholder="Optional name" maxlength="32">
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Bio</span>
+        <span class="settings-row-label" data-i18n="settings.profile.bio">Bio</span>
         <textarea id="settings-bio" placeholder="About you..." maxlength="150" rows="2"></textarea>
       </div>
     </div>
 
     <!-- Appearance Tab -->
     <div id="tab-appearance" class="settings-tab-content">
-      <div class="settings-section-title">Themes (Pillar 5)</div>
+      <div class="settings-section-title" data-i18n="settings.appearance.themes">Themes</div>
       <div class="theme-presets-grid">
         <button type="button" class="theme-preset-btn" data-theme="matrix">
           <span class="theme-preview" style="background:#000;border:1px solid #00FF41"></span>
-          <span class="theme-label">Matrix (Default)</span>
+          <span class="theme-label" data-i18n="theme.matrix">Matrix</span>
         </button>
         <button type="button" class="theme-preset-btn" data-theme="sakura_zen">
           <span class="theme-preview" style="background:linear-gradient(135deg,#140a0e,#ffb7c5)"></span>
-          <span class="theme-label">Sakura Zen</span>
+          <span class="theme-label" data-i18n="theme.sakura">Sakura Zen</span>
         </button>
         <button type="button" class="theme-preset-btn" data-theme="aurora_flow">
           <span class="theme-preview" style="background:linear-gradient(135deg,#0a0a12,#00E5FF)"></span>
-          <span class="theme-label">Aurora Flow</span>
+          <span class="theme-label" data-i18n="theme.aurora">Aurora Flow</span>
         </button>
         <button type="button" class="theme-preset-btn" data-theme="retro_synth">
           <span class="theme-preview" style="background:linear-gradient(180deg,#140a18,#FF00FF)"></span>
-          <span class="theme-label">Retro Synth</span>
+          <span class="theme-label" data-i18n="theme.retro">Retro Synth</span>
         </button>
         <button type="button" class="theme-preset-btn" data-theme="obsidian">
           <span class="theme-preview" style="background:#000000"></span>
-          <span class="theme-label">Obsidian</span>
+          <span class="theme-label" data-i18n="theme.obsidian">Obsidian</span>
         </button>
       </div>
       
-      <div class="settings-section-title">Motion & Density</div>
+      <div class="settings-section-title" data-i18n="settings.appearance.motion">Motion & Density</div>
       <div class="settings-row">
-        <span class="settings-row-label">Reduce UI Animations</span>
+        <span class="settings-row-label" data-i18n="settings.appearance.reduceAnimations">Reduce UI Animations</span>
         <label class="tg-toggle"><input type="checkbox" id="reduce-animations-toggle">
           <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
       </div>
 
       <div class="settings-row">
-        <span class="settings-row-label">Density</span>
+        <span class="settings-row-label" data-i18n="settings.appearance.density">Density</span>
         <select id="appearance-density">
           <option value="compact">Compact</option>
           <option value="default" selected>Default</option>
@@ -423,7 +424,7 @@
       </div>
 
       <div class="settings-row">
-        <span class="settings-row-label">Bubble style</span>
+        <span class="settings-row-label" data-i18n="settings.appearance.bubble">Bubble style</span>
         <select id="appearance-bubble">
           <option value="rounded" selected>Rounded</option>
           <option value="square">Square</option>
@@ -431,7 +432,7 @@
       </div>
 
       <div class="settings-row" style="align-items:flex-start;">
-        <span class="settings-row-label">Color scheme</span>
+        <span class="settings-row-label" data-i18n="settings.appearance.scheme">Color scheme</span>
         <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
           <button type="button" class="color-dot" data-scheme="default" aria-label="Default" style="width:18px;height:18px;border-radius:50%;border:1px solid var(--tg-divider);background:#5b9bd5"></button>
           <button type="button" class="color-dot" data-scheme="emerald" aria-label="Emerald" style="width:18px;height:18px;border-radius:50%;border:1px solid var(--tg-divider);background:#50c878"></button>
@@ -442,11 +443,11 @@
       </div>
 
       <div class="settings-row">
-        <span class="settings-row-label">Custom colors</span>
-        <button type="button" id="open-theme-customizer-btn" class="tg-link-btn">Open</button>
+        <span class="settings-row-label" data-i18n="settings.appearance.custom">Customize theme</span>
+        <button type="button" id="open-theme-customizer-btn" class="tg-link-btn" data-i18n="common.open">Open</button>
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Text size</span>
+        <span class="settings-row-label" data-i18n="settings.appearance.textSize">Text size</span>
         <div class="appearance-size-picker">
           <button class="size-btn" data-size="small">A</button>
           <button class="size-btn active" data-size="medium">A</button>
@@ -457,69 +458,81 @@
 
     <!-- Media Tab -->
     <div id="tab-media" class="settings-tab-content">
-      <div class="settings-section-title">Audio & Video</div>
+      <div class="settings-section-title" data-i18n="settings.media.title">Audio & Video</div>
       <div class="settings-row">
-        <span class="settings-row-label">Mic device</span>
+        <span class="settings-row-label" data-i18n="settings.media.mic">Mic device</span>
         <select id="mic-device-select"></select>
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Echo cancellation</span>
+        <span class="settings-row-label" data-i18n="settings.media.echo">Echo cancellation</span>
         <label class="tg-toggle"><input type="checkbox" id="echo-cancel-toggle" checked>
           <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Noise suppression</span>
+        <span class="settings-row-label" data-i18n="settings.media.noise">Noise suppression</span>
         <label class="tg-toggle"><input type="checkbox" id="noise-suppression-toggle" checked>
           <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Auto gain</span>
+        <span class="settings-row-label" data-i18n="settings.media.gain">Auto gain</span>
         <label class="tg-toggle"><input type="checkbox" id="auto-gain-toggle" checked>
           <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Video quality</span>
+        <span class="settings-row-label" data-i18n="settings.media.videoQuality">Video quality</span>
         <select id="video-quality-select">
           <option value="low">Low (15fps)</option>
           <option value="medium" selected>Medium (24fps)</option>
           <option value="high">High (30fps HD)</option>
         </select>
       </div>
-      <button id="test-mic-btn" class="settings-btn settings-btn-default">Test microphone</button>
-      <button id="stop-mic-test-btn" class="settings-btn settings-btn-default" style="display:none">Stop test</button>
+      <button id="test-mic-btn" class="settings-btn settings-btn-default" data-i18n="settings.media.testMic">Test microphone</button>
+      <button id="stop-mic-test-btn" class="settings-btn settings-btn-default" style="display:none" data-i18n="settings.media.stopTest">Stop test</button>
       <div id="mic-level-bar" style="height:4px;background:var(--tg-accent);width:0%;margin:0 16px;border-radius:2px;transition:width 0.1s"></div>
     </div>
 
     <!-- Security Tab -->
     <div id="tab-security" class="settings-tab-content">
-      <div class="settings-section-title">Network & Performance</div>
+      <div class="settings-section-title" data-i18n="settings.security.network">Network & Performance</div>
       <div class="settings-row">
-        <span class="settings-row-label">Data saver</span>
+        <span class="settings-row-label" data-i18n="settings.security.dataSaver">Data saver</span>
         <label class="tg-toggle"><input type="checkbox" id="data-saver-toggle">
           <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Battery saver</span>
+        <span class="settings-row-label" data-i18n="settings.security.batterySaver">Battery saver</span>
         <label class="tg-toggle"><input type="checkbox" id="battery-saver-toggle">
           <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
       </div>
 
-      <div class="settings-section-title">Privacy</div>
+      <div class="settings-section-title" data-i18n="settings.security.privacy">Privacy</div>
       <div class="settings-row">
-        <span class="settings-row-label">Typing indicator</span>
+        <span class="settings-row-label" data-i18n="settings.security.typing">Typing indicator</span>
         <label class="tg-toggle"><input type="checkbox" id="typing-indicator-toggle" checked>
           <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Allow screenshots</span>
+        <span class="settings-row-label" data-i18n="settings.security.screenshots">Allow screenshots</span>
         <label class="tg-toggle"><input type="checkbox" id="allow-screenshots-toggle">
           <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
       </div>
       <div class="settings-row">
-        <span class="settings-row-label">Duress password</span>
+        <span class="settings-row-label" data-i18n="settings.security.duress">Duress password</span>
         <input type="password" id="duress-password-input" placeholder="Min 6 chars">
       </div>
-      <button id="panic-wipe-btn" class="settings-btn settings-btn-danger">Wipe all local data</button>
+      <button id="panic-wipe-btn" class="settings-btn settings-btn-danger" data-i18n="settings.security.wipe">Wipe all local data</button>
+    </div>
+
+    <!-- Languages Tab -->
+    <div id="tab-languages" class="settings-tab-content">
+      <div class="settings-section-title" data-i18n="settings.languages.title">Languages</div>
+      <div class="settings-row" style="align-items:flex-start;">
+        <span class="settings-row-label" data-i18n="settings.languages.label">App language</span>
+        <div class="segmented" role="tablist" aria-label="Languages">
+          <button type="button" id="lang-en-btn" class="active" data-lang="en">EN</button>
+          <button type="button" id="lang-ru-btn" data-lang="ru">RU</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -677,36 +690,46 @@
         <path d="M19 12H5M12 5l-7 7 7 7"/>
       </svg>
     </button>
-    <span class="settings-title-text">Настройка темы</span>
+    <span class="settings-title-text" data-i18n="customizer.title">Customize theme</span>
   </div>
   <div class="settings-body">
-    <div class="settings-section-title">Цвета</div>
+    <div class="settings-section-title" data-i18n="customizer.colors">Colors</div>
     <div class="settings-row">
-      <span class="settings-row-label">Основной акцент</span>
+      <span class="settings-row-label" data-i18n="customizer.accent">Accent</span>
       <input type="color" id="custom-theme-accent" value="#5b9bd5">
     </div>
     <div class="settings-row">
-      <span class="settings-row-label">Фон (основной)</span>
+      <span class="settings-row-label" data-i18n="customizer.bgPrimary">Background (primary)</span>
       <input type="color" id="custom-theme-bg-primary" value="#25252c">
     </div>
     <div class="settings-row">
-      <span class="settings-row-label">Фон (вторичный)</span>
+      <span class="settings-row-label" data-i18n="customizer.bgSecondary">Background (secondary)</span>
       <input type="color" id="custom-theme-bg-secondary" value="#1a1a1f">
     </div>
     <div class="settings-row">
-      <span class="settings-row-label">Фон (ввод)</span>
+      <span class="settings-row-label" data-i18n="customizer.bgInput">Background (input)</span>
       <input type="color" id="custom-theme-bg-input" value="#2e2e36">
     </div>
     
-    <div class="settings-section-title">Производительность</div>
+    <div class="settings-section-title" data-i18n="customizer.motion">Motion</div>
     <div class="settings-row">
-      <span class="settings-row-label">Сбережение нагрузки<br><small style="color:var(--tg-text-hint);font-size:11px">Уменьшает анимации на 50%</small></span>
+      <span class="settings-row-label" data-i18n="customizer.animFps">Animation smoothness</span>
+      <input type="range" id="theme-fps-range" min="0" max="60" step="15" value="0" style="width: 160px;">
+    </div>
+
+    <div class="settings-row">
+      <span class="settings-row-label" data-i18n="customizer.wind">Wind strength</span>
+      <input type="range" id="theme-wind-range" min="60" max="180" step="5" value="115" style="width: 160px;">
+    </div>
+
+    <div class="settings-row">
+      <span class="settings-row-label" data-i18n="customizer.reduce">Reduce load</span>
       <label class="tg-toggle"><input type="checkbox" id="reduce-animations-toggle-customizer">
         <span class="tg-toggle-track"></span><span class="tg-toggle-knob"></span></label>
     </div>
     
-    <button id="apply-custom-theme-btn" class="settings-btn settings-btn-default" style="background:var(--tg-accent);color:#fff;margin-top:24px;">Применить</button>
-    <button id="reset-custom-theme-btn" class="settings-btn settings-btn-danger">Сбросить цвета</button>
+    <button id="apply-custom-theme-btn" class="settings-btn settings-btn-default" style="background:var(--tg-accent);color:#fff;margin-top:24px;" data-i18n="common.apply">Apply</button>
+    <button id="reset-custom-theme-btn" class="settings-btn settings-btn-danger" data-i18n="common.reset">Reset</button>
   </div>
 </div>
 

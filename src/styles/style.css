@@ -736,6 +736,142 @@ select {
   border-radius: 0;
 }
 
+@media (max-width: 900px) {
+  #settings-view,
+  #theme-customizer-modal {
+    max-width: 100%;
+  }
+}
+
+.tg-link-btn {
+  background: none;
+  border: none;
+  color: var(--tg-accent);
+  font: inherit;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.tg-link-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+.modal-card {
+  width: min(560px, 100%);
+  max-height: min(86dvh, 680px);
+  overflow: auto;
+  background: var(--tg-bg-primary);
+  border: 1px solid var(--tg-divider);
+  border-radius: 18px;
+  box-shadow: 0 14px 60px rgba(0, 0, 0, 0.55);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--tg-divider);
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tg-text-primary);
+  cursor: pointer;
+}
+
+.icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.modal-content {
+  padding: 16px;
+}
+
+.btn {
+  border: 1px solid var(--tg-divider);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tg-text-primary);
+  padding: 10px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: var(--tg-accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.drop-quality-card .drop-option {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.drop-quality-card .drop-option input {
+  accent-color: var(--tg-accent);
+}
+
+.segmented {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--tg-divider);
+  border-radius: 16px;
+}
+
+.segmented button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--tg-text-secondary);
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.segmented button.active {
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--tg-text-primary);
+}
+
 #settings-view {
   transform: translateX(-100%);
 }
