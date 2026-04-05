@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -36,6 +36,32 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media', 'mediaKeySystem', 'notifications'];
+    callback(allowedPermissions.includes(permission));
+  });
+
+  ipcMain.handle('dialog:selectFile', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'All Files', extensions: ['*'] }]
+    });
+    return result;
+  });
+
+  ipcMain.handle('dialog:saveFile', async (event, data, defaultName) => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: defaultName
+    });
+    if (!result.canceled && result.filePath) {
+      fs.writeFileSync(result.filePath, Buffer.from(data));
+      return { success: true, path: result.filePath };
+    }
+    return { success: false };
+  });
+
+  ipcMain.handle('app:getVersion', () => app.getVersion());
+
   createWindow();
   if (!isDev) {
     import('electron-updater').then(({ autoUpdater }) => {

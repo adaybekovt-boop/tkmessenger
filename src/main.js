@@ -1,3 +1,4 @@
+import './styles/style.css';
 import Peer from 'peerjs';
 import { registerSW } from 'virtual:pwa-register';
 import { dbInit, dbGetPage, dbGetLast, dbAdd, dbUpdateStatus, dbDelete, dbClearAll, dbGetPendingOut, dbSetPendingOut } from './core/db.js';
@@ -1114,15 +1115,27 @@ function initAppChrome() {
   on('open-settings-btn', 'click', openSettingsPanel);
   on('close-settings-btn', 'click', closeSettingsPanel);
   on('save-settings-btn', 'click', saveSettings);
+  // ============================================
+  // ADD FRIEND MODAL HANDLERS
+  // ============================================
+  // [MODAL: #add-friend-modal] Action: Open modal via sidebar
   on('open-add-friend-btn', 'click', openAddFriendModal);
+  
+  // [MODAL: #add-friend-modal] Action: Close modal
   on('close-add-friend-modal-btn', 'click', closeAddFriendModal);
+  
+  // [MODAL: #add-friend-modal] Action: Copy my ID block
   on('copy-my-id-btn', 'click', () => {
     navigator.clipboard.writeText(myPeerId).then(() => showToast('ID copied!')).catch(() => showToast(myPeerId));
   });
+  
+  // [MODAL: #add-friend-modal] Action: Add friend by ID button
   on('confirm-add-friend-btn', 'click', () => {
     const id = byId('add-friend-id-input')?.value?.trim?.() || '';
     if (id) { addFriend(id); closeAddFriendModal(); }
   });
+  
+  // [MODAL: #add-friend-modal] Action: Enter key support for input
   on('add-friend-id-input', 'keydown', (e) => {
     if (e.key === 'Enter') {
       const id = e.target?.value?.trim?.() || '';
@@ -1420,20 +1433,42 @@ on('nudge-btn', 'click', () => {
   const bottomSettingsBtn = document.getElementById('bottom-settings-btn');
   if (bottomSettingsBtn) bottomSettingsBtn.addEventListener('click', openSettingsPanel);
 
-  // Nearby peer modal
+  // ============================================
+  // NEARBY PEER MODAL HANDLERS
+  // ============================================
+  // [MODAL: #nearby-peer-modal] Action: Close modal and clear state
   on('nearby-close-btn', 'click', () => {
     const modal = document.getElementById('nearby-peer-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+      modal.style.display = 'none';
+      const idEl = document.getElementById('nearby-peer-id');
+      if (idEl) idEl.textContent = '';
+    }
   });
+  
+  // [MODAL: #nearby-peer-modal] Action: Send Message (opens chat)
   on('nearby-send-btn', 'click', () => {
     const peerId = document.getElementById('nearby-peer-id')?.textContent || '';
     const modal = document.getElementById('nearby-peer-modal');
-    if (peerId) { if (modal) modal.style.display = 'none'; addFriend(peerId); openChat(peerId); }
+    if (peerId) {
+      if (modal) modal.style.display = 'none';
+      addFriend(peerId);
+      openChat(peerId);
+      // Clear state
+      document.getElementById('nearby-peer-id').textContent = '';
+    }
   });
+  
+  // [MODAL: #nearby-peer-modal] Action: Add to Contacts without opening chat
   on('nearby-add-btn', 'click', () => {
     const peerId = document.getElementById('nearby-peer-id')?.textContent || '';
     const modal = document.getElementById('nearby-peer-modal');
-    if (peerId) { addFriend(peerId); if (modal) modal.style.display = 'none'; }
+    if (peerId) {
+      addFriend(peerId);
+      if (modal) modal.style.display = 'none';
+      // Clear state
+      document.getElementById('nearby-peer-id').textContent = '';
+    }
   });
 
   on('messages-list', 'click', (e) => {
