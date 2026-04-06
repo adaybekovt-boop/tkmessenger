@@ -16,6 +16,7 @@ export default function AuthScreen() {
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarFile, setAvatarFile] = useState(null);
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -26,8 +27,9 @@ export default function AuthScreen() {
   const canSubmit = useMemo(() => {
     if (!nickname.trim()) return false;
     if (!password.trim()) return false;
+    if (mode === 'register' && password !== confirmPassword) return false;
     return true;
-  }, [nickname, password]);
+  }, [confirmPassword, mode, nickname, password]);
 
   const submit = async () => {
     if (!canSubmit || busy) return;
@@ -37,10 +39,16 @@ export default function AuthScreen() {
       if (mode === 'login') {
         await auth.login({ nickname, password });
       } else {
+        if (password !== confirmPassword) throw new Error('Пароли не совпадают');
         await auth.register({ nickname, password, displayName, bio, avatarFile });
       }
     } catch (e) {
-      setErr(e?.message ? String(e.message) : 'Ошибка');
+      const msg = e?.message ? String(e.message) : 'Ошибка';
+      if (/null is not an object|evaluating|undefined is not an object/i.test(msg)) {
+        setErr('Не удалось обработать аватар. Попробуй другое изображение или без аватара.');
+      } else {
+        setErr(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -116,6 +124,20 @@ export default function AuthScreen() {
             </label>
 
             {mode === 'register' ? (
+              <label className="grid gap-1">
+                <span className="text-xs text-[rgb(var(--orb-muted-rgb))]">Повтори пароль</span>
+                <input
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="h-12 rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))]"
+                  placeholder="Повтори пароль"
+                  type="password"
+                  autoComplete="new-password"
+                />
+              </label>
+            ) : null}
+
+            {mode === 'register' ? (
               <>
                 <label className="grid gap-1">
                   <span className="text-xs text-[rgb(var(--orb-muted-rgb))]">Отображаемое имя</span>
@@ -147,6 +169,7 @@ export default function AuthScreen() {
                     className="text-xs text-[rgb(var(--orb-muted-rgb))]"
                   />
                 </label>
+
               </>
             ) : null}
 
@@ -172,4 +195,3 @@ export default function AuthScreen() {
     </div>
   );
 }
-

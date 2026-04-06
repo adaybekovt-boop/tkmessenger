@@ -446,6 +446,22 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, theme, s
                       <UserRound className="h-4 w-4" />
                       Сохранить профиль
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => auth.setAutoLogin(!auth.autoLoginEnabled)}
+                      className={cx(
+                        'inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs ring-1 transition-all duration-300 ease-in-out active:scale-95',
+                        auth.autoLoginEnabled
+                          ? 'bg-[rgb(var(--orb-accent-rgb))] text-white ring-[rgb(var(--orb-accent-rgb))]/40'
+                          : 'bg-[rgb(var(--orb-bg-rgb))]/45 text-[rgb(var(--orb-text-rgb))] ring-[rgb(var(--orb-border-rgb))]'
+                      )}
+                      aria-pressed={auth.autoLoginEnabled}
+                    >
+                      <Shield className="h-4 w-4" />
+                      Автовход: {auth.autoLoginEnabled ? 'вкл' : 'выкл'}
+                    </button>
+
                     <button
                       type="button"
                       onClick={auth.logout}

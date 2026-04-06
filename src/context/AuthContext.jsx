@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { clearAuthToken, issueAuthToken, readAuthToken, verifyAuthToken } from '../core/authToken.js';
+import { derivePasswordRecord, verifyPasswordRecord } from '../core/passwordKdf.js';
 
 function safeJsonParse(value, fallback) {
   try {
@@ -12,30 +14,42 @@ function normalizeNick(input) {
   return String(input || '').trim();
 }
 
-async function sha256Hex(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 async function fileToDataUrl(file) {
   if (!file) return null;
-  const bmp = await createImageBitmap(file);
+  const maxBytes = 3 * 1024 * 1024;
+  if (file.size > maxBytes) throw new Error('Аватар слишком большой (макс 3MB)');
+  if (!String(file.type || '').startsWith('image/')) throw new Error('Нужна картинка');
+
+  const readAsDataUrl = () =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result || ''));
+      r.onerror = () => reject(r.error || new Error('Ошибка чтения файла'));
+      r.readAsDataURL(file);
+    });
+
+  const src = await readAsDataUrl();
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = src;
+
+  await new Promise((resolve, reject) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => reject(new Error('Не удалось обработать изображение'));
+  });
+
   const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    bmp.close();
-    return null;
-  }
-  const sc = Math.max(size / bmp.width, size / bmp.height);
-  const w = bmp.width * sc;
-  const h = bmp.height * sc;
+  if (!ctx) throw new Error('Canvas недоступен');
+  const sc = Math.max(size / img.naturalWidth, size / img.naturalHeight);
+  const w = img.naturalWidth * sc;
+  const h = img.naturalHeight * sc;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bmp, (size - w) / 2, (size - h) / 2, w, h);
-  bmp.close();
+  ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
   return canvas.toDataURL('image/jpeg', 0.86);
 }
 
@@ -54,7 +68,8 @@ function makePeerIdFromNick(nickname) {
 
 const STORAGE = {
   users: 'orbits_users_v1',
-  session: 'orbits_session_v1'
+  session: 'orbits_session_v1',
+  autoLogin: 'orbits_autologin_enabled'
 };
 
 const AuthContext = createContext(null);
@@ -62,18 +77,50 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authState, setAuthState] = useState('loading');
+  const [autoLoginEnabled, setAutoLoginEnabled] = useState(() => {
+    const v = localStorage.getItem(STORAGE.autoLogin);
+    return v === 'true';
+  });
 
   useEffect(() => {
-    const users = safeJsonParse(localStorage.getItem(STORAGE.users), {});
-    const sessionNick = normalizeNick(localStorage.getItem(STORAGE.session));
-    const record = sessionNick ? users[sessionNick] : null;
-    if (record) {
-      setUser(record);
-      setAuthState('authed');
-    } else {
-      setUser(null);
-      setAuthState('guest');
-    }
+    const boot = async () => {
+      const users = safeJsonParse(localStorage.getItem(STORAGE.users), {});
+      const enabled = localStorage.getItem(STORAGE.autoLogin) === 'true';
+      setAutoLoginEnabled(enabled);
+
+      if (enabled) {
+        try {
+          const token = await readAuthToken();
+          if (token) {
+            const body = await verifyAuthToken(token);
+            const nick = body?.nickname ? normalizeNick(body.nickname) : '';
+            const record = nick ? users[nick] : null;
+            if (record) {
+              localStorage.setItem(STORAGE.session, nick);
+              setUser(record);
+              setAuthState('authed');
+              return;
+            }
+          }
+        } catch (_) {
+        }
+        try {
+          await clearAuthToken();
+        } catch (_) {
+        }
+      }
+
+      const sessionNick = normalizeNick(localStorage.getItem(STORAGE.session));
+      const record = sessionNick ? users[sessionNick] : null;
+      if (record) {
+        setUser(record);
+        setAuthState('authed');
+      } else {
+        setUser(null);
+        setAuthState('guest');
+      }
+    };
+    void boot();
   }, []);
 
   const persistUser = useCallback((record) => {
@@ -88,13 +135,32 @@ export function AuthProvider({ children }) {
     const users = safeJsonParse(localStorage.getItem(STORAGE.users), {});
     const record = users[nick];
     if (!record) throw new Error('Пользователь не найден');
-    const passHash = await sha256Hex(`${nick}:${password}:ORBITS_P2P`);
-    if (passHash !== record.passHash) throw new Error('Неверный пароль');
+
+    const ok = await verifyPasswordRecord({ nickname: nick, password, record: record.pass || record });
+    if (!ok) throw new Error('Неверный пароль');
+
+    if (!record.pass || record.pass.passHash) {
+      try {
+        const pass = await derivePasswordRecord({ nickname: nick, password });
+        record.pass = pass;
+        delete record.passHash;
+        persistUser(record);
+      } catch (_) {
+      }
+    }
+
     localStorage.setItem(STORAGE.session, nick);
     setUser(record);
     setAuthState('authed');
+
+    if (localStorage.getItem(STORAGE.autoLogin) === 'true') {
+      try {
+        await issueAuthToken({ nickname: record.nickname, peerId: record.peerId }, 14 * 24 * 60 * 60 * 1000);
+      } catch (_) {
+      }
+    }
     return record;
-  }, []);
+  }, [persistUser]);
 
   const register = useCallback(async ({ nickname, password, displayName, bio, avatarFile }) => {
     const nick = normalizeNick(nickname);
@@ -103,13 +169,13 @@ export function AuthProvider({ children }) {
     const users = safeJsonParse(localStorage.getItem(STORAGE.users), {});
     if (users[nick]) throw new Error('Такой ник уже занят на этом устройстве');
 
-    const passHash = await sha256Hex(`${nick}:${password}:ORBITS_P2P`);
+    const pass = await derivePasswordRecord({ nickname: nick, password });
     const peerId = makePeerIdFromNick(nick);
     const avatarDataUrl = await fileToDataUrl(avatarFile);
 
     const record = {
       nickname: nick,
-      passHash,
+      pass,
       peerId,
       displayName: normalizeNick(displayName) || nick,
       bio: String(bio || '').slice(0, 220),
@@ -120,12 +186,23 @@ export function AuthProvider({ children }) {
     localStorage.setItem(STORAGE.session, nick);
     setUser(record);
     setAuthState('authed');
+
+    if (localStorage.getItem(STORAGE.autoLogin) === 'true') {
+      try {
+        await issueAuthToken({ nickname: record.nickname, peerId: record.peerId }, 14 * 24 * 60 * 60 * 1000);
+      } catch (_) {
+      }
+    }
     return record;
   }, []);
 
   const logout = useCallback(() => {
     try {
       localStorage.removeItem(STORAGE.session);
+    } catch (_) {
+    }
+    try {
+      void clearAuthToken();
     } catch (_) {
     }
     setUser(null);
@@ -148,16 +225,39 @@ export function AuthProvider({ children }) {
     return next;
   }, [persistUser, user]);
 
+  const setAutoLogin = useCallback(async (enabled) => {
+    const next = !!enabled;
+    setAutoLoginEnabled(next);
+    try {
+      localStorage.setItem(STORAGE.autoLogin, next ? 'true' : 'false');
+    } catch (_) {
+    }
+    if (!next) {
+      try {
+        await clearAuthToken();
+      } catch (_) {
+      }
+      return;
+    }
+    if (!user) return;
+    try {
+      await issueAuthToken({ nickname: user.nickname, peerId: user.peerId }, 14 * 24 * 60 * 60 * 1000);
+    } catch (_) {
+    }
+  }, [user]);
+
   const value = useMemo(() => {
     return {
       authState,
       user,
+      autoLoginEnabled,
       login,
       register,
       logout,
-      updateProfile
+      updateProfile,
+      setAutoLogin
     };
-  }, [authState, login, logout, register, updateProfile, user]);
+  }, [authState, autoLoginEnabled, login, logout, register, setAutoLogin, updateProfile, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -167,4 +267,3 @@ export function useAuth() {
   if (!v) throw new Error('AuthContext is missing');
   return v;
 }
-
