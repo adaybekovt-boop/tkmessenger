@@ -48,6 +48,9 @@ orbitsDrop.onFileReady = async (msgId, fileUrl, metadata) => {
     msg.dropPercent = 100;
     msg.dropStatusText = 'Completed';
     msg.url = fileUrl; // Switch to the actual object URL
+    if (typeof fileUrl === 'string' && fileUrl.startsWith('blob:')) {
+      activeObjectUrls.add(fileUrl);
+    }
     
     // Auto-download files, but not images/videos (they display inline)
     if (!metadata.mime.startsWith('image/') && !metadata.mime.startsWith('video/')) {
@@ -624,7 +627,7 @@ function startIdlePeerMonitor() {
       const lastActivity = peerActivityTimestamps.get(peerId) || now;
       
       // If we are actively in a call with this peer, keep them awake
-      if (callManager?.activeCall && (callManager.activeCall.peer === peerId || callingTarget === peerId)) {
+      if (callManager?.activeCall && callManager.activeCall.peer === peerId) {
         touchPeerActivity(peerId);
         continue;
       }
@@ -692,6 +695,10 @@ async function cropImageFileToJpegDataUrl(file) {
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    bmp.close();
+    return null;
+  }
   const sc = Math.max(size / bmp.width, size / bmp.height);
   const w = bmp.width * sc;
   const h = bmp.height * sc;
@@ -712,6 +719,7 @@ function applyProfilePalette() {
     c.width = 32;
     c.height = 32;
     const x = c.getContext('2d');
+    if (!x) return;
     x.drawImage(img, 0, 0, 32, 32);
     const d = x.getImageData(0, 0, 32, 32).data;
     const at = (px, py) => {
@@ -1757,7 +1765,19 @@ function _initPeerConnection(peerId) {
       showToast('Connection lost. Reconnecting...');
       setTimeout(() => peer?.reconnect(), 2000);
     } else if (err.type === 'unavailable-id') {
-      showToast('Nickname already in use!');
+      showToast('Peer ID already in use. Retrying...');
+      try {
+        if (peer && !peer.destroyed) peer.destroy();
+      } catch (_) { /* ignore */ }
+      peer = null;
+      peerIdleDisconnected = false;
+      const base = (myPeerId || '').split('-')[0] || (myNickname ? await getOrCreatePeerId(myNickname) : 'ORBIT');
+      const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+      myPeerId = `${base}-${suffix}`.slice(0, 64);
+      localStorage.setItem('orbit_peer_id', myPeerId);
+      setTimeout(() => {
+        _initPeerConnection(myPeerId);
+      }, 350);
     } else {
       console.warn('Peer error:', err.type);
     }
@@ -1943,7 +1963,7 @@ async function renderFriends() {
 
   list.innerHTML = '';
   indexed.forEach(({ f, preview: previewObj }) => {
-    const isOnline = !!activeConnections[f.id];
+    const isOnline = !!activeConnections[f.id]?.open;
     const preview = previewObj ? previewObj.text || 'Media' : 'No messages yet';
     const profile = friendProfiles[f.id] || {};
     const displayName = profile.displayName || f.id;
@@ -2074,7 +2094,7 @@ async function openChat(friendId) {
   const friendDisplayName = fp.displayName || friendId;
   document.getElementById('chat-friend-name').textContent = friendDisplayName;
 
-  const isOnline = !!activeConnections[friendId];
+  const isOnline = !!activeConnections[friendId]?.open;
   document.getElementById('chat-friend-status').textContent = isOnline ? 'online' : 'offline';
   document.getElementById('chat-friend-status').style.color = isOnline ? 'var(--tg-online)' : 'var(--tg-text-secondary)';
 

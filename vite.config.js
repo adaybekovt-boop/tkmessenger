@@ -1,21 +1,24 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => ({
-  // Use relative base for maximum compatibility with GitHub Pages and local builds
   base: './',
   plugins: [
+    react(),
     VitePWA({
       injectRegister: null,
       registerType: 'autoUpdate',
-      includeAssets: [],
+      includeAssets: ['pwa-192x192.svg', 'pwa-512x512.svg', '404.html', '.nojekyll'],
       manifest: {
         name: 'Orbits P2P',
         short_name: 'Orbits',
-        description: 'Decentralized P2P Messenger',
-        theme_color: '#1a1a1f',
+        description: 'Высокопроизводительный P2P-мессенджер — Phase 1: Криптографическое ядро',
+        theme_color: '#05050A',
         background_color: '#05050A',
         display: 'standalone',
+        start_url: './',
+        scope: './',
         icons: [
           {
             src: 'pwa-192x192.svg',
@@ -38,6 +41,10 @@ export default defineConfig(({ mode }) => ({
       }
     })
   ],
+  // Поддержка загрузки WebAssembly
+  optimizeDeps: {
+    exclude: ['orbits-crypto']
+  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
@@ -54,6 +61,21 @@ export default defineConfig(({ mode }) => ({
     target: 'esnext'
   },
   esbuild: {},
-  worker: { format: 'es' },
-  server: { port: 5173 }
+  worker: {
+    format: 'es',
+    rollupOptions: {
+      output: {
+        // Wasm файлы должны быть доступны воркерам
+        inlineDynamicImports: true
+      }
+    }
+  },
+  server: {
+    port: 5173,
+    headers: {
+      // Заголовки для корректной работы SharedArrayBuffer и Wasm
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp'
+    }
+  }
 }));

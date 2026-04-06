@@ -119,6 +119,10 @@ export const optimizer = {
           canvas.width = Math.max(1, width | 0);
           canvas.height = Math.max(1, height | 0);
           const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(file);
+            return;
+          }
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           canvas.toBlob(
             (blob) => {

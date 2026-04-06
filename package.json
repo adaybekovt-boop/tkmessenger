@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:wasm": "cd src-rust && wasm-pack build --target web --out-dir ../pkg",
+    "build:full": "npm run build:wasm && npm run build",
     "preview": "vite preview",
     "electron": "electron electron.mjs",
     "electron-dev": "cross-env NODE_ENV=development electron electron.mjs",
@@ -18,15 +20,22 @@
   },
   "dependencies": {
     "@capacitor/core": "^6.0.0",
-    "peerjs": "^1.5.4"
+    "lucide-react": "^0.468.0",
+    "peerjs": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@capacitor/android": "^6.0.0",
     "@capacitor/cli": "^6.0.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
     "electron": "^30.0.0",
     "electron-builder": "^24.13.3",
     "electron-updater": "^6.3.9",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
     "terser": "^5.36.0",
     "vite": "^5.2.0",
     "vite-plugin-pwa": "^1.2.0"

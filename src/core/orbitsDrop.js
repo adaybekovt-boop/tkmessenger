@@ -83,6 +83,10 @@ export class OrbitsDrop {
         canvas.height = targetHeight;
         
         const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
         // Better scaling algorithm
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';

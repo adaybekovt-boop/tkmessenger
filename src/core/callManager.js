@@ -69,8 +69,9 @@ export function createCallManager(options) {
 
     // --- Glare resolution: both sides calling each other simultaneously ---
     if (callStatus === 'calling' && callingTarget === callerId) {
-      const myNickname = options.getMyNickname ? options.getMyNickname() : '';
-      if (myNickname > callerId) {
+      const myPeerId = String(options.peer?.id || '');
+      const keepOutgoing = myPeerId && myPeerId < String(callerId);
+      if (keepOutgoing) {
         // My outgoing call has priority — ignore/reject their incoming
         call.close();
         return;

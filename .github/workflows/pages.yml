@@ -25,11 +25,16 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Install Rust and Wasm-Pack
+        run: |
+          rustup target add wasm32-unknown-unknown
+          npm install -g wasm-pack
+
       - name: Install dependencies
         run: npm install
 
-      - name: Build
-        run: npm run build
+      - name: Build WebAssembly and Web App
+        run: npm run build:full
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

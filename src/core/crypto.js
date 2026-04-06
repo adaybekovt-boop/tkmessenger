@@ -10,8 +10,18 @@ try {
 let fallbackAesKey = null;
 const pending = new Map();
 let nextId = 1;
+const WORKER_TIMEOUT_MS = 20000;
 
 if (worker) {
+  const rejectAllPending = (err) => {
+    for (const { reject } of pending.values()) {
+      try {
+        reject(err);
+      } catch (_) { /* ignore */ }
+    }
+    pending.clear();
+  };
+
   worker.onmessage = (e) => {
     const { id, result, error } = e.data;
     if (pending.has(id)) {
@@ -20,6 +30,16 @@ if (worker) {
       if (error) reject(new Error(error));
       else resolve(result);
     }
+  };
+
+  worker.onerror = () => {
+    rejectAllPending(new Error('Crypto worker error'));
+    worker = null;
+  };
+
+  worker.onmessageerror = () => {
+    rejectAllPending(new Error('Crypto worker message error'));
+    worker = null;
   };
 }
 
@@ -116,7 +136,21 @@ function callWorker(type, payload) {
 
   return new Promise((resolve, reject) => {
     const id = nextId++;
-    pending.set(id, { resolve, reject });
+    const timeoutId = setTimeout(() => {
+      if (!pending.has(id)) return;
+      pending.delete(id);
+      reject(new Error('Crypto worker timeout'));
+    }, WORKER_TIMEOUT_MS);
+    pending.set(id, {
+      resolve: (v) => {
+        clearTimeout(timeoutId);
+        resolve(v);
+      },
+      reject: (e) => {
+        clearTimeout(timeoutId);
+        reject(e);
+      }
+    });
     worker.postMessage({ id, type, payload });
   });
 }
