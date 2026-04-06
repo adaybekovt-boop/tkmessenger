@@ -14,8 +14,11 @@ function formatTime(ts, showSeconds) {
 }
 
 function safeJsonParse(value, fallback) {
+  if (value == null) return fallback;
   try {
-    return JSON.parse(value);
+    const parsed = JSON.parse(value);
+    if (parsed == null || typeof parsed !== 'object') return fallback;
+    return parsed;
   } catch (_) {
     return fallback;
   }
@@ -97,8 +100,8 @@ function ConnectBar({ onConnect }) {
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="ID пира для подключения"
-          className="h-11 flex-1 rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))]"
+          placeholder="Введите ID друга"
+          className="h-11 flex-1 rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] focus:ring-[rgb(var(--orb-accent-rgb))]/50 transition-all duration-300 ease-in-out"
         />
         <button
           type="button"
@@ -189,7 +192,7 @@ export default function Chats() {
         <ConnectBar onConnect={peer.connect} />
       </div>
       <div className="px-4 pt-4 pb-2">
-        <div className="text-xs font-semibold tracking-wide text-[rgb(var(--orb-muted-rgb))]">ПИРЫ</div>
+        <div className="text-xs font-semibold tracking-wide text-[rgb(var(--orb-muted-rgb))]">КОНТАКТЫ</div>
       </div>
       <div className="orb-scroll flex-1 overflow-y-auto px-2 pb-3">
         {list.length ? (
@@ -205,7 +208,7 @@ export default function Chats() {
             />
           ))
         ) : (
-          <div className="px-4 py-6 text-sm text-[rgb(var(--orb-muted-rgb))]">Пока нет пиров. Подключись по ID.</div>
+          <div className="px-4 py-6 text-sm text-[rgb(var(--orb-muted-rgb))]">Контактов нет.<br/>Введи ID друга выше, чтобы начать чат!</div>
         )}
       </div>
     </div>
@@ -266,7 +269,7 @@ export default function Chats() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={1}
-              placeholder={activeId ? 'Сообщение…' : 'Сначала подключись к пиру…'}
+              placeholder={activeId ? 'Сообщение…' : 'Выберите контакт для общения…'}
               disabled={!activeId}
               className="max-h-32 min-h-[46px] flex-1 resize-none rounded-3xl bg-[rgb(var(--orb-surface-rgb))]/55 px-4 py-3 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out disabled:opacity-60"
               onKeyDown={(e) => {
@@ -315,7 +318,7 @@ export default function Chats() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">Пиры</div>
+                <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">Контакты</div>
                 <button
                   type="button"
                   onClick={() => setMobileListOpen(false)}

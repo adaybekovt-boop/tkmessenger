@@ -13,8 +13,11 @@ function isValidPeerId(input) {
 }
 
 function safeJsonParse(value, fallback) {
+  if (value == null) return fallback;
   try {
-    return JSON.parse(value);
+    const parsed = JSON.parse(value);
+    if (parsed == null) return fallback;
+    return parsed;
   } catch (_) {
     return fallback;
   }
@@ -232,10 +235,30 @@ export function usePeer({ enabled = true, desiredPeerId = '', localProfile = nul
     setStatus('подключение');
     setError(null);
 
-    const peer = new Peer(desiredId || undefined);
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    function createPeer(id) {
+      try {
+        return new Peer(id || undefined, {
+          debug: 0,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+          }
+        });
+      } catch (_) {
+        return new Peer(undefined, { debug: 0 });
+      }
+    }
+
+    const peer = createPeer(desiredId);
     peerRef.current = peer;
 
     const onOpen = (id) => {
+      retryCount = 0;
       const normalized = normalizePeerId(id);
       setPeerId(normalized);
       try {
@@ -261,12 +284,27 @@ export function usePeer({ enabled = true, desiredPeerId = '', localProfile = nul
     };
     const onDisconnected = () => {
       setStatus('офлайн');
+      if (peer && !peer.destroyed) {
+        setTimeout(() => {
+          if (peerRef.current === peer && !peer.destroyed) {
+            peer.reconnect();
+          }
+        }, 3000);
+      }
     };
     const onClose = () => {
       setStatus('закрыт');
     };
     const onError = (err) => {
       setError(err?.type ? String(err.type) : 'ошибка');
+      if ((err?.type === 'network' || err?.type === 'server-error') && retryCount < maxRetries) {
+        retryCount++;
+        setTimeout(() => {
+          if (peerRef.current === peer && !peer.destroyed) {
+            peer.reconnect();
+          }
+        }, 3000);
+      }
       if (err?.type === 'unavailable-id') {
         try {
           localStorage.removeItem(STORAGE.peerId);

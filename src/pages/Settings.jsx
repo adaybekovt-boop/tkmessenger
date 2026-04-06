@@ -134,7 +134,11 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, theme, s
 
   const [chatPrefs, setChatPrefs] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('orbits_chat_prefs_v1') || '{"showSeconds":false}');
+      const raw = localStorage.getItem('orbits_chat_prefs_v1');
+      if (raw == null) return { showSeconds: false };
+      const parsed = JSON.parse(raw);
+      if (parsed == null || typeof parsed !== 'object') return { showSeconds: false };
+      return parsed;
     } catch (_) {
       return { showSeconds: false };
     }
@@ -188,9 +192,12 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, theme, s
   }, [peer.error, peer.status]);
 
   const mic = useMemo(() => {
-    const stored = localStorage.getItem('orbits_mic_settings_v1');
     try {
-      return stored ? JSON.parse(stored) : {};
+      const stored = localStorage.getItem('orbits_mic_settings_v1');
+      if (stored == null) return {};
+      const parsed = JSON.parse(stored);
+      if (parsed == null || typeof parsed !== 'object') return {};
+      return parsed;
     } catch (_) {
       return {};
     }
@@ -338,7 +345,7 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, theme, s
     screen === 'home'
       ? 'Разделы настроек'
       : screen === 'profile'
-        ? 'PeerJS ID и статус соединения'
+        ? 'Твой ID и сетевой статус'
         : screen === 'chats'
           ? 'Настройка чатов и история'
         : screen === 'appearance'
@@ -369,7 +376,7 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, theme, s
               {screen === 'home' ? (
                 <>
                   <div className="grid gap-3">
-                    <ActionCard icon={Shield} title="Профиль и сеть" subtitle={`Твой ID и статус (${online ? 'онлайн' : 'оффлайн'})`} onClick={() => setScreen('profile')} />
+                    <ActionCard icon={Shield} title="Профиль и безопасность" subtitle={`Твой ID и статус (${online ? 'онлайн' : 'оффлайн'})`} onClick={() => setScreen('profile')} />
                     <ActionCard icon={MessageSquare} title="Чаты" subtitle="Настройка чатов, синхронизация, очистка" onClick={() => setScreen('chats')} />
                     <ActionCard icon={Palette} title="Внешний вид" subtitle="Темы и цвет акцента" onClick={() => setScreen('appearance')} />
                     <ActionCard icon={Mic2} title="Микрофон" subtitle="Устройство, эффекты и тест" onClick={() => setScreen('mic')} />
@@ -380,7 +387,7 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, theme, s
               ) : null}
 
               {screen === 'profile' ? (
-                <Section icon={Shield} title="Профиль и сеть" subtitle="PeerJS ID и состояние">
+                <Section icon={Shield} title="Профиль и сеть" subtitle="Твой уникальный ID для друзей">
                   <Row label="Профиль">
                     <div className="flex items-center gap-3">
                       {auth.user?.avatarDataUrl ? (
@@ -473,7 +480,7 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, theme, s
                     {profileSaved ? <div className="text-xs text-[rgb(var(--orb-success-rgb))]">{profileSaved}</div> : null}
                   </div>
 
-                  <Row label="Твой Peer ID">
+                  <Row label="Твой ID (поделись с друзьями)">
                     <div className="flex items-center gap-2">
                       <div className="max-w-[220px] truncate rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/45 px-3 py-2 font-mono text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] sm:max-w-[420px]">
                         {peerIdLabel}
@@ -501,7 +508,7 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, theme, s
                     <div className="rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/45 px-3 py-2 text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))]">{statusText}</div>
                   </Row>
                   <div className="mt-2 text-xs text-[rgb(var(--orb-muted-rgb))]">
-                    Важно: PeerJS — это P2P. Если собеседник оффлайн, сообщение уйдёт в очередь и доставится при появлении связи.
+                    Сообщения передаются напрямую к другу. Если он оффлайн, сообщения дойдут, когда он появится в сети.
                   </div>
                 </Section>
               ) : null}

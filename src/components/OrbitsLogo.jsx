@@ -7,7 +7,7 @@ export default function OrbitsLogo({ className = '', variant = 'inline' }) {
       <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/70 shadow-[0_0_0_1px_rgba(59,130,246,0.25),0_0_28px_rgba(59,130,246,0.18)] ring-1 ring-[rgb(var(--orb-border-rgb))] overflow-hidden">
         {imgOk ? (
           <img
-            src="/orbits-logo.svg"
+            src="./orbits-logo.svg"
             alt="ORBITS P2P"
             className="h-7 w-7"
             onError={() => setImgOk(false)}

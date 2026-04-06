@@ -49,7 +49,11 @@ body,
 
 html {
   color-scheme: dark;
-  background: rgb(var(--orb-bg-rgb));
+  background: radial-gradient(100% 100% at 0% 0%, rgba(var(--orb-accent-rgb), 0.12) 0%, transparent 50%),
+              radial-gradient(100% 100% at 100% 100%, rgba(var(--orb-accent-rgb), 0.08) 0%, transparent 50%),
+              rgb(var(--orb-bg-rgb));
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 body {
@@ -61,15 +65,19 @@ body {
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  letter-spacing: -0.01em;
 }
 
 .orb-blur {
-  backdrop-filter: blur(24px);
+  backdrop-filter: blur(32px) saturate(150%);
+  -webkit-backdrop-filter: blur(32px) saturate(150%);
 }
 
 html.orb-reduce .orb-blur {
   backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background-color: rgba(var(--orb-surface-rgb), 0.95) !important;
 }
 
 .orb-scroll {
