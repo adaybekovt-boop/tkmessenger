@@ -3,7 +3,7 @@ export function validateUsername(username) {
   if (!v) return { ok: false, code: 'required' };
   if (v.length < 3) return { ok: false, code: 'min_len' };
   if (v.length > 30) return { ok: false, code: 'max_len' };
-  if (!/^[a-z0-9_]+$/.test(v)) return { ok: false, code: 'pattern' };
+  if (!/^[\p{L}\p{N}_]+$/u.test(v)) return { ok: false, code: 'pattern' };
   return { ok: true, value: v };
 }
 

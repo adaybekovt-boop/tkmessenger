@@ -5,7 +5,9 @@ describe('authValidation', () => {
   it('validates username rules', () => {
     expect(validateUsername('ab').ok).toBe(false);
     expect(validateUsername('a'.repeat(31)).ok).toBe(false);
-    expect(validateUsername('Tamer').ok).toBe(false);
+    expect(validateUsername('Tamerxz22').ok).toBe(true);
+    expect(validateUsername('Tamer_xz22').ok).toBe(true);
+    expect(validateUsername('Тамер').ok).toBe(true);
     expect(validateUsername('tamer_01').ok).toBe(true);
   });
 
