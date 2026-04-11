@@ -299,7 +299,28 @@ export function usePeer({ enabled = true, desiredPeerId = '', localProfile = nul
     connsRef.current.set(key, conn);
     if (ch === 'reliable') upsertPeer(remoteId, { status: 'connecting', lastSeenAt: now() });
 
+    // Timeout: if the reliable connection doesn't open within 15s, mark peer offline.
+    let connectTimer = null;
+    if (ch === 'reliable') {
+      connectTimer = setTimeout(() => {
+        const current = connsRef.current.get(key);
+        if (current === conn && !conn.open) {
+          try { conn.close(); } catch (_) {}
+          connsRef.current.delete(key);
+          upsertPeer(remoteId, { status: 'offline', lastSeenAt: now() });
+          // Also close the ephemeral channel if it didn't open.
+          const ephKey = connKey(remoteId, 'ephemeral');
+          const ephConn = connsRef.current.get(ephKey);
+          if (ephConn && !ephConn.open) {
+            try { ephConn.close(); } catch (_) {}
+            connsRef.current.delete(ephKey);
+          }
+        }
+      }, 15000);
+    }
+
     const onOpen = () => {
+      if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
       if (ch === 'reliable') {
         upsertPeer(remoteId, { status: 'online', lastSeenAt: now() });
         if (!selectedPeerIdRef.current) setSelectedPeerId(remoteId);
@@ -322,12 +343,14 @@ export function usePeer({ enabled = true, desiredPeerId = '', localProfile = nul
       }
     };
     const onClose = () => {
+      if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
       const current = connsRef.current.get(key);
       if (current === conn) connsRef.current.delete(key);
       if (ch === 'reliable') upsertPeer(remoteId, { status: 'offline', lastSeenAt: now() });
       else stopHeartbeatIfIdle();
     };
     const onError = () => {
+      if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
       if (ch === 'reliable') upsertPeer(remoteId, { status: 'offline', lastSeenAt: now() });
     };
 

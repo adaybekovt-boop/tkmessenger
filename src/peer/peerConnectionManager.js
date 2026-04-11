@@ -72,6 +72,10 @@ export class PeerConnectionManager {
     };
 
     const onOpen = (id) => {
+      if (self._initialConnectTimer) {
+        clearTimeout(self._initialConnectTimer);
+        self._initialConnectTimer = null;
+      }
       self.reconnectAttempt = 0;
       self.networkErrStreak = 0;
       self.lastNetworkErrAt = 0;
@@ -213,6 +217,16 @@ export class PeerConnectionManager {
     this.peer = peer;
     this._attachHandlers(peer, this._handlers);
 
+    // Initial connection timeout: if the signaling server doesn't respond
+    // within 30s, surface an error instead of spinning "connecting" forever.
+    this._initialConnectTimer = setTimeout(() => {
+      this._initialConnectTimer = null;
+      if (this.peer && !this.peer.open && !this.peer.destroyed) {
+        this.cb.setStatus?.('disconnected');
+        this.cb.setError?.('Не удалось подключиться к серверу — проверьте интернет');
+      }
+    }, 30000);
+
     // Network + visibility listeners.
     const onOnline = () => {
       const p = this.peer;
@@ -267,6 +281,10 @@ export class PeerConnectionManager {
 
   /** Full teardown: clear timers, remove listeners, release lock, destroy peer. */
   stop() {
+    if (this._initialConnectTimer) {
+      clearTimeout(this._initialConnectTimer);
+      this._initialConnectTimer = null;
+    }
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
