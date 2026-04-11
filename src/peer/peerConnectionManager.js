@@ -79,6 +79,7 @@ export class PeerConnectionManager {
       self.reconnectAttempt = 0;
       self.networkErrStreak = 0;
       self.lastNetworkErrAt = 0;
+      self.cb.setPeerId?.(normalizePeerId(id));
       self.cb.setStatus?.('connected');
       self.cb.setError?.(null);
       self.cb.onOpen?.(normalizePeerId(id), self.peer);
