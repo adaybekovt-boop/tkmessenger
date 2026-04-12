@@ -11,7 +11,6 @@
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
 use pbkdf2::pbkdf2_hmac;
 use sha2::{Digest, Sha256};
@@ -145,14 +144,14 @@ pub fn scrypt_derive(
 /// HMAC-SHA256 подпись.
 pub fn hmac_sign(key: &[u8], data: &[u8]) -> Vec<u8> {
     let mut mac =
-        HmacSha256::new_from_slice(key).expect("HMAC key length should be valid");
+        <HmacSha256 as Mac>::new_from_slice(key).expect("HMAC key length should be valid");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
 }
 
 /// HMAC-SHA256 проверка.
 pub fn hmac_verify(key: &[u8], signature: &[u8], data: &[u8]) -> bool {
-    let mut mac = match HmacSha256::new_from_slice(key) {
+    let mut mac = match <HmacSha256 as Mac>::new_from_slice(key) {
         Ok(m) => m,
         Err(_) => return false,
     };
