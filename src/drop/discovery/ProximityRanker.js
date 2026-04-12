@@ -9,10 +9,10 @@ const NEAR_MAX_MS = 50;
 const MID_MAX_MS = 200;
 
 /** @returns {'near' | 'mid' | 'far'} */
-export function classifyRtt(rttMs) {
-  if (rttMs == null || !Number.isFinite(rttMs)) return 'far';
-  if (rttMs <= NEAR_MAX_MS) return 'near';
-  if (rttMs <= MID_MAX_MS) return 'mid';
+export function classifyRtt(rtt) {
+  if (rtt == null || !Number.isFinite(rtt)) return 'far';
+  if (rtt <= NEAR_MAX_MS) return 'near';
+  if (rtt <= MID_MAX_MS) return 'mid';
   return 'far';
 }
 
@@ -20,16 +20,16 @@ export function classifyRtt(rttMs) {
  * Return a sorted copy of `entries`. Entries with a known RTT come first,
  * ordered ascending; unknown RTT falls back to lastSeenAt.
  *
- * @param {Array<{id: string, rttMs?: number, lastSeenAt?: number}>} entries
+ * @param {Array<{id: string, rtt?: number, lastSeenAt?: number}>} entries
  */
 export function rankByProximity(entries) {
   const list = Array.isArray(entries) ? entries.slice() : [];
   for (const e of list) {
-    e.bucket = classifyRtt(e.rttMs);
+    e.bucket = classifyRtt(e.rtt);
   }
   list.sort((a, b) => {
-    const ar = a.rttMs == null ? Number.POSITIVE_INFINITY : a.rttMs;
-    const br = b.rttMs == null ? Number.POSITIVE_INFINITY : b.rttMs;
+    const ar = a.rtt == null ? Number.POSITIVE_INFINITY : a.rtt;
+    const br = b.rtt == null ? Number.POSITIVE_INFINITY : b.rtt;
     if (ar !== br) return ar - br;
     return (b.lastSeenAt || 0) - (a.lastSeenAt || 0);
   });

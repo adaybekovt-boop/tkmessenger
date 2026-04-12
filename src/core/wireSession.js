@@ -213,7 +213,9 @@ export async function acceptHello(peerId, myPeerId, helloMsg) {
   session.remoteDhPubSpki = base64ToBytes(pubB64);
 
   // Treat wireRekey as a full reset: drop any prior ratchet state.
-  if (helloMsg.type === 'wireRekey' && session.state) {
+  // Also reset on a fresh wireHello if we already had a completed session —
+  // the remote side reconnected with new DH keys, so the old ratchet is stale.
+  if (session.state && (helloMsg.type === 'wireRekey' || session.ready)) {
     session.state = null;
     resetPendingReady(session);
   }

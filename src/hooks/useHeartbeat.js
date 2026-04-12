@@ -30,7 +30,10 @@ export function useHeartbeat({ connsRef, peerIdRef, peersRef, getConn, upsertPee
         const rid = p.id;
         const last = lastHeartbeatByPeerRef.current.get(rid) || 0;
         const reliable = getConn(rid, 'reliable');
-        if (!reliable?.open && last && nowTs - last > 25000) {
+        if (reliable?.open) {
+          // Reliable channel is alive — ensure status reflects online.
+          if (p.status !== 'online') upsertPeer(rid, { status: 'online' });
+        } else if (last && nowTs - last > 25000) {
           upsertPeer(rid, { status: 'offline' });
         }
       }

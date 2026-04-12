@@ -148,20 +148,22 @@ export function usePeer({ enabled = true, desiredPeerId = '', localProfile = nul
   const call = useCallSession({ peerRef, peerIdRef, blockedPeersRef });
 
   // ─── Drop transport wiring ────────────────────────────────────────────────
-  // DropManager runs on the ephemeral channel. All traffic is now encrypted
-  // via the shared Double Ratchet session (encrypt-or-drop).
+  // Beacons are sent unencrypted because they contain only peerId + nickname
+  // and need to flow before a wire handshake is established (chicken-and-egg).
+  // Actual file data still travels over the encrypted reliable channel.
 
-  const broadcastDropEphemeral = useCallback(async (packet) => {
-    for (const [key] of connsRef.current.entries()) {
-      if (!key.endsWith('|ephemeral')) continue;
-      const remoteId = key.split('|')[0];
-      await sendEncryptedEphemeral(remoteId, packet);
+  const broadcastDropEphemeral = useCallback((packet) => {
+    for (const [key, conn] of connsRef.current.entries()) {
+      if (!key.endsWith('|ephemeral') || !conn?.open) continue;
+      try { conn.send(packet); } catch (_) {}
     }
-  }, [sendEncryptedEphemeral]);
+  }, []);
 
   const sendDropEphemeralTo = useCallback((remoteId, packet) => {
-    return sendEncryptedEphemeral(normalizePeerId(remoteId), packet);
-  }, [sendEncryptedEphemeral]);
+    const conn = getConn(normalizePeerId(remoteId), 'ephemeral');
+    if (!conn?.open) return false;
+    try { conn.send(packet); return true; } catch (_) { return false; }
+  }, [getConn]);
 
   const getDropIdentity = useCallback(() => {
     const prof = localProfileRef.current || {};
@@ -214,6 +216,7 @@ export function usePeer({ enabled = true, desiredPeerId = '', localProfile = nul
 
   // Latest-refs so the long-lived useEffect can call them without re-running.
   const attachConnRef = useLatestRef(attachConn);
+  const getConnRef = useLatestRef(getConn);
   const callHandleIncomingRef = useLatestRef(call.handleIncomingCall);
   const callEndRef = useLatestRef(call.endCall);
   const dropHandlePacketRef = useLatestRef(drop.handlePacket);
@@ -292,6 +295,33 @@ export function usePeer({ enabled = true, desiredPeerId = '', localProfile = nul
                 return next;
               });
             } catch (_) {}
+
+            // Auto-connect to known peers so status goes online and messages flow.
+            for (const p of list.slice(0, 80)) {
+              const pid = normalizePeerId(p.id);
+              if (!pid || pid === id) continue;
+              try {
+                const r = getConnRef.current(pid, 'reliable');
+                const e = getConnRef.current(pid, 'ephemeral');
+                if (r?.open && e?.open) continue;
+                if (!r || !r.open) {
+                  const conn = peer.connect(pid, {
+                    reliable: true,
+                    label: 'reliable',
+                    metadata: { channel: 'reliable', initiator: true }
+                  });
+                  attachConnRef.current(conn, 'reliable');
+                }
+                if (!e || !e.open) {
+                  const conn = peer.connect(pid, {
+                    reliable: false,
+                    label: 'ephemeral',
+                    metadata: { channel: 'ephemeral', initiator: true }
+                  });
+                  attachConnRef.current(conn, 'ephemeral');
+                }
+              } catch (_) {}
+            }
           })();
         },
         onConnection: (conn) => {
@@ -425,26 +455,46 @@ export function usePeer({ enabled = true, desiredPeerId = '', localProfile = nul
     pcmRef.current?.reconnectNow();
   }, []);
 
-  // Discover all peers connected to the signaling server (not just contacts).
-  // Returns a promise that resolves to an array of peer IDs.
+  // Discover peers — tries the signaling server's listAllPeers first, but
+  // falls back to the local contacts list (public PeerJS servers disable
+  // discovery, so listAllPeers usually returns nothing).
   const discoverPeers = useCallback(() => {
     return new Promise((resolve) => {
       const p = peerRef.current;
+      const myId = peerIdRef.current;
+      const blocked = blockedPeersRef.current || [];
+      const knownIds = (peersRef.current || [])
+        .map((x) => x.id)
+        .filter((id) => id && id !== myId && !blocked.includes(id));
+
       if (!p || p.destroyed || p.disconnected || !p.open) {
-        resolve([]);
+        resolve(knownIds);
         return;
       }
+
+      let resolved = false;
+      const finish = (ids) => {
+        if (resolved) return;
+        resolved = true;
+        resolve(ids);
+      };
+
+      // 3-second timeout in case listAllPeers hangs on public servers.
+      const timer = setTimeout(() => finish(knownIds), 3000);
+
       try {
         p.listAllPeers((ids) => {
-          const myId = peerIdRef.current;
-          const blocked = blockedPeersRef.current || [];
+          clearTimeout(timer);
           const filtered = (ids || []).filter(
             (id) => id && id !== myId && !blocked.includes(id)
           );
-          resolve(filtered);
+          // Merge signaling results with known contacts.
+          const merged = [...new Set([...filtered, ...knownIds])];
+          finish(merged);
         });
       } catch (_) {
-        resolve([]);
+        clearTimeout(timer);
+        finish(knownIds);
       }
     });
   }, []);

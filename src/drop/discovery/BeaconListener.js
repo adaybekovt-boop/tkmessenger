@@ -25,7 +25,7 @@ export class BeaconListener {
   constructor({ sendTo, onChange }) {
     this._sendTo = sendTo || (() => false);
     this._onChange = onChange || (() => {});
-    /** @type {Map<string, {id: string, nickname: string, rttMs: number|null, lastSeenAt: number}>} */
+    /** @type {Map<string, {peerId: string, nickname: string, rtt: number|null, lastSeenAt: number}>} */
     this._byId = new Map();
     this._sweepTimer = null;
   }
@@ -50,9 +50,9 @@ export class BeaconListener {
   handleBeacon(remoteId, packet) {
     const existing = this._byId.get(remoteId) || {};
     this._byId.set(remoteId, {
-      id: remoteId,
+      peerId: remoteId,
       nickname: String(packet?.nickname || existing.nickname || ''),
-      rttMs: existing.rttMs ?? null,
+      rtt: existing.rtt ?? null,
       lastSeenAt: Date.now()
     });
     this._emit();
@@ -74,15 +74,15 @@ export class BeaconListener {
     if (!echoTs) return;
     const rtt = Math.max(0, Date.now() - echoTs);
     const existing = this._byId.get(remoteId) || {
-      id: remoteId,
+      peerId: remoteId,
       nickname: '',
-      rttMs: null,
+      rtt: null,
       lastSeenAt: Date.now()
     };
     this._byId.set(remoteId, {
-      id: remoteId,
+      peerId: remoteId,
       nickname: existing.nickname || '',
-      rttMs: rtt,
+      rtt,
       lastSeenAt: Date.now()
     });
     this._emit();

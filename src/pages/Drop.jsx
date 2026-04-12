@@ -102,26 +102,22 @@ export default function Drop() {
   peerRef.current = peer;
 
   // Activate Drop beacon on mount, deactivate on unmount.
-  // Also discover peers on the signaling server and open ephemeral channels
-  // so beacons can flow even between peers that haven't connected before.
+  // Open ephemeral channels to known peers so beacons can flow.
   useEffect(() => {
     dropRef.current.activate();
 
-    let timer = null;
-    const ensureConnections = async () => {
-      try {
-        const ids = await peerRef.current.discoverPeers();
-        for (const id of ids) {
-          peerRef.current.drop.openEphemeral?.(id);
-        }
-      } catch (_) {}
+    const ensureConnections = () => {
+      const peers = peerRef.current.peers || [];
+      for (const p of peers) {
+        peerRef.current.drop.openEphemeral?.(p.id);
+      }
     };
 
     ensureConnections();
-    timer = setInterval(ensureConnections, 5000);
+    const timer = setInterval(ensureConnections, 5000);
 
     return () => {
-      if (timer) clearInterval(timer);
+      clearInterval(timer);
       dropRef.current.deactivate();
     };
   }, []);
