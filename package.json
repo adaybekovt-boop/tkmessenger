@@ -1,0 +1,96 @@
+{
+  "name": "orbits-p2p",
+  "version": "5.1.0",
+  "description": "Decentralized P2P Messenger",
+  "type": "module",
+  "main": "electron.mjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:full": "vite build",
+    "preview": "vite preview",
+    "electron": "electron electron.mjs",
+    "electron-dev": "cross-env NODE_ENV=development electron electron.mjs",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:android": "npm run build && npx cap sync android",
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.0.0",
+    "framer-motion": "^11.3.31",
+    "idb": "^8.0.0",
+    "lucide-react": "^0.468.0",
+    "peerjs": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "scrypt-js": "^3.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-updater": "^6.3.9",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "terser": "^5.36.0",
+    "vite": "^5.2.0",
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^2.1.9",
+    "jsdom": "^25.0.1",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.5.2",
+    "fake-indexeddb": "^6.0.0",
+    "@vitest/coverage-v8": "^2.1.9"
+  },
+  "build": {
+    "appId": "com.orbits.p2p",
+    "productName": "Orbits Titan",
+    "files": [
+      "dist/**/*",
+      "electron.mjs",
+      "preload.cjs"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "dist/assets/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "dist/assets/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "dist/assets/icon.icns"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

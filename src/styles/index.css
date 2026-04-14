@@ -1,0 +1,217 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Default tokens — used before <ThemeProvider> has applied a manifest
+ * (first paint, pre-hydration, and any code path that reads --orb-* vars
+ * outside React). These values mirror the classic-dark manifest at
+ * src/themes/catalog/classic/darkManifest.js so the pre-hydration flash
+ * matches the default theme. When updating classic-dark, update both.
+ *
+ * Theme-specific overrides are now written onto <html> at runtime by
+ * src/themes/applyTokens.js — do not add html[data-theme='…'] blocks here.
+ */
+:root {
+  --orb-bg-rgb: 5 5 5;
+  --orb-surface-rgb: 18 18 18;
+  --orb-border-rgb: 38 38 42;
+  --orb-text-rgb: 235 235 240;
+  --orb-muted-rgb: 140 140 155;
+  --orb-accent-rgb: 90 120 160;
+  --orb-success-rgb: 34 197 94;
+  --orb-danger-rgb: 244 63 94;
+  --orb-vvh: 1vh;
+  --orb-vv-offset-top: 0px;
+  --orb-kb: 0px;
+  /* Height of the bottom tab nav. Collapses to 0 while the keyboard is up
+     so the chat composer can sit flush above it (WhatsApp/Telegram-like). */
+  --orb-nav-h: 64px;
+}
+
+html[data-keyboard='1'] {
+  --orb-nav-h: 0px;
+}
+
+/* Bottom tab nav — animates out of the way while the on-screen keyboard is
+   open so the chat composer can sit flush above it. The `main` element's
+   height calc reads --orb-nav-h and reclaims the space in one motion. */
+.orb-nav-bar {
+  transition: height 0.22s ease-out, padding 0.22s ease-out, opacity 0.18s ease-out;
+  will-change: height;
+}
+
+html[data-keyboard='1'] .orb-nav-bar {
+  height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+@supports (height: 100svh) {
+  html,
+  body,
+  #root {
+    height: calc(var(--orb-vvh, 1vh) * 100);
+  }
+}
+
+html {
+  color-scheme: dark;
+  background: rgb(var(--orb-bg-rgb));
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.orb-blur {
+  backdrop-filter: blur(32px) saturate(150%);
+  -webkit-backdrop-filter: blur(32px) saturate(150%);
+}
+
+html.orb-reduce .orb-blur {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background-color: rgba(var(--orb-surface-rgb), 0.95) !important;
+}
+
+.orb-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scroll-behavior: smooth;
+}
+
+.orb-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.orb-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.orb-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+.orb-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+html.orb-reduce * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 120ms !important;
+  scroll-behavior: auto !important;
+}
+
+html.orb-reduce {
+  scroll-behavior: auto;
+}
+
+
+/* ─── Atmospheric theme pass-through ────────────────────────────────────
+   When an atmospheric theme loads a Background component, ThemeProvider
+   adds .orb-atmospheric on <html>. Strip opaque backgrounds from the app
+   shell and page roots so the animated background layer shows through,
+   but keep UI chrome (header, nav, cards) readable with frosted glass. */
+html.orb-atmospheric {
+  background: transparent !important;
+}
+html.orb-atmospheric .orb-page-bg {
+  background-color: transparent !important;
+}
+
+/* ── Header & tab bar: solid frosted glass ── */
+html.orb-atmospheric header,
+html.orb-atmospheric .orb-nav-bar {
+  background-color: rgba(var(--orb-bg-rgb), 0.92) !important;
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
+}
+
+/* ── Section cards (Settings, modals): near-opaque so text is readable ── */
+html.orb-atmospheric section {
+  background-color: rgba(var(--orb-bg-rgb), 0.88) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── Sidebar, chat header, composer: readable glass ── */
+html.orb-atmospheric aside {
+  background-color: rgba(var(--orb-bg-rgb), 0.90) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── Scrollable content areas: heavier dimming so animated backgrounds
+     (Matrix rain, Sakura petals…) don't overpower text. Applied to the
+     chat message area, Radar, Drop, and any future page's main scroll
+     container. ── */
+html.orb-atmospheric .orb-content-scrim {
+  background-color: rgba(0, 0, 0, 0.55) !important;
+}
+
+/* ── Inputs, buttons with bg — keep readable ── */
+html.orb-atmospheric .orb-blur {
+  background-color: rgba(var(--orb-bg-rgb), 0.85) !important;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+*:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.9);
+  outline-offset: 2px;
+}
+
+/* Chat Background Pattern for vibe */
+.chat-bg-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Phase 3.4 — Prevent double-tap zoom on inputs (iOS) */
+/* iOS Safari auto-zooms inputs with font-size < 16px */
+input, textarea, select {
+  font-size: max(16px, 1em);
+  touch-action: manipulation;
+}
+
+button, a {
+  touch-action: manipulation;
+}
