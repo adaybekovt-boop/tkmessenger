@@ -205,7 +205,12 @@ export function useConnections({ peerRef, peerIdRef, selectedPeerIdRef, localPro
         }
       }
 
-      void dispatchReliableInbound(data, conn, remoteId, {
+      // After a successful reliable inbound dispatch, flush the outbox
+      // for this peer. This handles the case where Bob (the peer with the
+      // lexicographically larger ID) receives Alice's first message after
+      // a fresh handshake: the DH ratchet step during decryption gives
+      // Bob a sendCk, and the flush retries any queued outgoing messages.
+      dispatchReliableInbound(data, conn, remoteId, {
         localProfileRef,
         peerIdRef,
         seenMsgIdsRef,
@@ -235,7 +240,9 @@ export function useConnections({ peerRef, peerIdRef, selectedPeerIdRef, localPro
         onHandshakeError: (err) => { try { console.warn('[wire] handshake error', err); } catch (_) {} },
         onDecryptError: (err) => { try { console.warn('[wire] decrypt error', err); } catch (_) {} },
         onUnexpectedPlaintext: (d) => { try { console.warn('[wire] dropped unencrypted payload', d?.type || typeof d); } catch (_) {} }
-      });
+      }).then((handled) => {
+        if (handled) void flushOutboxForPeer(remoteId);
+      }).catch(() => {});
     };
 
     conn.on('open', onOpen);

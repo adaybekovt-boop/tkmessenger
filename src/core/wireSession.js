@@ -179,6 +179,16 @@ export async function initiateHandshake(peerId, myPeerId) {
   // Role is assigned deterministically by peer id comparison.
   session.role = String(myPeerId).localeCompare(String(peerId)) < 0 ? 'alice' : 'bob';
 
+  // Reset readiness so that waitForWireReady blocks until the peer's
+  // wireHello arrives and acceptHello completes the new ratchet. Without
+  // this, a hydrated session resolves immediately, and outbound messages
+  // (profile_req, queued chat messages) get encrypted with the stale
+  // ratchet — the peer cannot decrypt them after processing our wireHello
+  // and resetting its own ratchet state.
+  if (session.ready) {
+    resetPendingReady(session);
+  }
+
   return {
     type: 'wireHello',
     v: 2,

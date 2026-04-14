@@ -105,9 +105,15 @@ export default function Drop() {
   // Open ephemeral channels to ALL discovered peers (not just contacts)
   // so beacons can flow between any two users with Drop open.
   useEffect(() => {
-    dropRef.current.activate();
-
     const ensureConnections = async () => {
+      // Activate Drop beacon (idempotent). Called here rather than once
+      // at mount because the DropManager is created in PeerProvider's
+      // useEffect, which runs AFTER this child component's useEffect
+      // (React fires effects bottom-up). On the first call managerRef
+      // is still null and activate() is a no-op; the 4-second retry
+      // catches it once the manager exists.
+      dropRef.current.activate();
+
       // Skip discovery polling while a transfer is active — we already
       // have the connection we need and extra signaling would only add noise.
       if (dropRef.current.state?.status === 'transferring') return;
