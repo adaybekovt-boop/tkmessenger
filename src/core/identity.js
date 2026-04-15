@@ -40,7 +40,8 @@ export function getIdentity() {
   } catch (_) {
   }
 
-  const legacyPeerId = String(localStorage.getItem(STORAGE.peerId) || '');
+  let legacyPeerId = '';
+  try { legacyPeerId = String(localStorage.getItem(STORAGE.peerId) || ''); } catch (_) {}
   if (isValidPeerId(legacyPeerId)) return { peerId: legacyPeerId, displayName: '' };
   return null;
 }
@@ -53,8 +54,12 @@ export function setIdentity(next) {
     peerId,
     displayName: String(next?.displayName || '').slice(0, 64)
   };
-  localStorage.setItem(STORAGE.peerId, peerId);
-  localStorage.setItem(STORAGE.identity, JSON.stringify(identity));
+  try {
+    localStorage.setItem(STORAGE.peerId, peerId);
+    localStorage.setItem(STORAGE.identity, JSON.stringify(identity));
+  } catch (_) {
+    // Private browsing or storage full — identity works in-memory only.
+  }
   return identity;
 }
 

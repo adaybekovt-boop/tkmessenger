@@ -1,23 +1,24 @@
-// Classic Dark — clean minimalist dark theme.
+// Classic Dark — clean dark theme with indigo-purple accent gradients.
 //
-// Pure black background (#050505), calm and spacious design.
-// No particles, no glow, no visual noise — premium minimalism.
+// Deep blue-tinted background, vibrant indigo→purple gradients on
+// user bubbles and key actions. Inspired by modern messenger aesthetics.
 
 /** @type {import('../../types.js').ThemeManifest} */
 const manifest = {
   id: 'classic-dark',
   name: 'Obsidian',
-  subtitle: 'Минимализм',
+  subtitle: 'Градиент',
   family: 'classic',
   colorScheme: 'dark',
 
   tokens: {
-    '--orb-bg-rgb':       '5 5 5',
-    '--orb-surface-rgb':  '18 18 18',
-    '--orb-border-rgb':   '38 38 42',
-    '--orb-text-rgb':     '235 235 240',
-    '--orb-muted-rgb':    '140 140 155',
-    '--orb-accent-rgb':   '90 120 160',
+    '--orb-bg-rgb':       '10 10 20',
+    '--orb-surface-rgb':  '22 22 38',
+    '--orb-border-rgb':   '45 45 65',
+    '--orb-text-rgb':     '240 240 250',
+    '--orb-muted-rgb':    '140 140 175',
+    '--orb-accent-rgb':   '99 102 241',
+    '--orb-accent2-rgb':  '147 51 234',
     '--orb-success-rgb':  '34 197 94',
     '--orb-danger-rgb':   '244 63 94'
   },

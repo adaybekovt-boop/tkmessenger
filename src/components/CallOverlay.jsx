@@ -43,6 +43,10 @@ export default function CallOverlay({ call }) {
     if (!el) return;
     el.srcObject = call.state.localStream || null;
     el.play?.().catch(() => {});
+    return () => {
+      // Detach stream on unmount so the browser can release the media device.
+      try { el.srcObject = null; } catch (_) {}
+    };
   }, [call?.localVideoRef, call?.state?.localStream]);
 
   useEffect(() => {
@@ -50,6 +54,9 @@ export default function CallOverlay({ call }) {
     if (!el) return;
     el.srcObject = call.state.remoteStream || null;
     el.play?.().catch(() => {});
+    return () => {
+      try { el.srcObject = null; } catch (_) {}
+    };
   }, [call?.remoteVideoRef, call?.state?.remoteStream]);
 
   useEffect(() => {

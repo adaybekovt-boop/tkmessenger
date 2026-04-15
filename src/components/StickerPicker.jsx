@@ -20,7 +20,7 @@ export default function StickerPicker({ open, onClose, onPick }) {
         const r = await getRecents(32);
         if (!cancelled) setRecents(r);
       }
-      if (activeTab !== 'recent' && !list.find((p) => p.id === activeTab)) {
+      if (!cancelled && activeTab !== 'recent' && !list.find((p) => p.id === activeTab)) {
         setActiveTab(list[0]?.id || 'recent');
       }
     })();

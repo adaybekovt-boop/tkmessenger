@@ -115,7 +115,21 @@ export default defineConfig(({ mode }) => ({
     headers: {
       // Заголовки для корректной работы SharedArrayBuffer и Wasm
       'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp'
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      // CSP: block inline script injection, allow data: for avatars,
+      // allow peerjs/signaling/fonts, and wasm-unsafe-eval for crypto worker.
+      'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self' 'wasm-unsafe-eval'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data: blob:",
+        "media-src 'self' blob: mediastream:",
+        "connect-src 'self' wss: ws: https:",
+        "worker-src 'self' blob:",
+        "object-src 'none'",
+        "base-uri 'self'"
+      ].join('; ')
     }
   }
 }));

@@ -112,8 +112,14 @@ export function encodeHeader({ dhPubSpki, n, pn }) {
 export function decodeHeader(b64) {
   const json = new TextDecoder().decode(base64ToBytes(b64));
   const obj = JSON.parse(json);
+  const dhPubSpki = base64ToBytes(String(obj.dh || ''));
+  // P-256 SPKI is 91 bytes. Reject obviously wrong sizes to catch
+  // corruption or tampering early instead of failing silently in ECDH.
+  if (dhPubSpki.length !== 91) {
+    throw new Error(`Invalid DH public key in header: expected 91 bytes SPKI, got ${dhPubSpki.length}`);
+  }
   return {
-    dhPubSpki: base64ToBytes(String(obj.dh || '')),
+    dhPubSpki,
     n: Number(obj.n) || 0,
     pn: Number(obj.pn) || 0
   };

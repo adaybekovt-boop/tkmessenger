@@ -23,7 +23,7 @@ import {
 import { usePeerContext } from '../context/PeerContext.jsx';
 import { hapticTap } from '../core/haptics.js';
 import { playSound, preloadSounds } from '../core/sounds.js';
-import { getBubbleRadius, getMyBubbleColors, getPeerBubbleColors, getFontSizeClass } from '../components/ChatSettings.jsx';
+import { getBubbleRadius, getMyBubbleColors, getMyBubbleMeta, getPeerBubbleColors, getFontSizeClass } from '../components/ChatSettings.jsx';
 import StickerPicker from '../components/StickerPicker.jsx';
 import VoiceRecorder, { VoiceButton } from '../components/VoiceRecorder.jsx';
 import VoicePlayer from '../components/VoicePlayer.jsx';
@@ -49,17 +49,23 @@ function safeJsonParse(value, fallback) {
   }
 }
 
-function Avatar({ profile, fallback }) {
-  if (profile?.avatarDataUrl) {
-    return <img alt="" src={profile.avatarDataUrl} className="h-11 w-11 rounded-full object-cover" />;
-  }
+function Avatar({ profile, fallback, online }) {
+  const img = profile?.avatarDataUrl;
   const letter = String(fallback || '?').trim().charAt(0).toUpperCase() || 'O';
   return (
-    <div className="grid h-11 w-11 place-items-center rounded-full bg-[rgb(var(--orb-surface-rgb))] text-sm font-medium text-[rgb(var(--orb-muted-rgb))]">
-      {letter}
+    <div className="relative">
+      {img ? (
+        <img alt="" src={img} className="h-11 w-11 rounded-full object-cover ring-2 ring-white/10" />
+      ) : (
+        <div className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-600/20 text-sm font-semibold text-[rgb(var(--orb-text-rgb))] ring-2 ring-white/10">
+          {letter}
+        </div>
+      )}
+      {online ? (
+        <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[rgb(var(--orb-bg-rgb))] bg-[rgb(var(--orb-success-rgb))]" />
+      ) : null}
     </div>
   );
-
 }
 
 function StatusDot({ status }) {
@@ -84,33 +90,32 @@ function PeerRow({ peer, active, meta, onClick }) {
       type="button"
       onClick={onClick}
       className={cx(
-        'w-full rounded-2xl px-3 py-3.5 text-left transition-colors duration-200',
+        'w-full rounded-2xl px-3 py-3 text-left transition-all duration-200',
         active
-          ? 'bg-[rgb(var(--orb-surface-rgb))]'
-          : 'hover:bg-[rgb(var(--orb-surface-rgb))]/40'
+          ? 'bg-gradient-to-r from-indigo-500/10 to-purple-600/10 ring-1 ring-indigo-500/20'
+          : 'hover:bg-white/[0.04]'
       )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Avatar profile={prof} fallback={display} />
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="truncate text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">{display}</div>
-              {unread > 0 ? (
-                <div className="shrink-0 grid h-5 min-w-5 place-items-center rounded-full bg-[rgb(var(--orb-accent-rgb))] px-1.5 text-[10px] font-semibold text-white">
-                  {unread}
-                </div>
-              ) : null}
-            </div>
-            <div className="mt-0.5 flex items-center justify-between gap-2">
-              <div className="min-w-0 truncate text-xs text-[rgb(var(--orb-muted-rgb))]">
-                {lastText ? lastText : peer.status === 'online' ? 'в сети' : peer.status === 'connecting' ? 'подключение…' : 'не в сети'}
-              </div>
+      <div className="flex items-center gap-3">
+        <Avatar profile={prof} fallback={display} online={peer.status === 'online'} />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <div className="truncate text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">{display}</div>
+            <div className="flex items-center gap-2">
               {lastTs ? <div className="shrink-0 text-[11px] text-[rgb(var(--orb-muted-rgb))]">{formatTime(lastTs, false)}</div> : null}
             </div>
           </div>
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <div className="min-w-0 truncate text-xs text-[rgb(var(--orb-muted-rgb))]">
+              {lastText ? lastText : peer.status === 'online' ? 'в сети' : peer.status === 'connecting' ? 'подключен��е…' : 'не в сети'}
+            </div>
+            {unread > 0 ? (
+              <div className="shrink-0 grid h-5 min-w-5 place-items-center rounded-full orb-gradient px-1.5 text-[10px] font-bold text-white shadow-lg shadow-indigo-500/25">
+                {unread}
+              </div>
+            ) : null}
+          </div>
         </div>
-        <StatusDot status={peer.status} />
       </div>
     </button>
   );
@@ -134,14 +139,14 @@ function ConnectBar({ onConnect }) {
   };
 
   return (
-    <div className="rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/40 p-3">
+    <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.06]">
       <div className="flex items-center gap-2">
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void submit(); }}
           placeholder="Введите ID друга"
-          className="h-10 flex-1 rounded-xl bg-[rgb(var(--orb-bg-rgb))]/60 px-4 text-sm text-[rgb(var(--orb-text-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] focus:outline-none transition-colors duration-200"
+          className="h-10 flex-1 rounded-full bg-white/[0.06] px-4 text-sm text-[rgb(var(--orb-text-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all duration-200"
         />
         <button
           type="button"
@@ -149,8 +154,8 @@ function ConnectBar({ onConnect }) {
             hapticTap();
             void submit();
           }}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--orb-accent-rgb))] text-sm font-medium text-white transition-colors duration-200 active:scale-95"
-          aria-label="Добавить контакт"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full orb-gradient text-sm font-medium text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 active:scale-95 hover:shadow-indigo-500/40"
+          aria-label="Добавить ��онтакт"
         >
           <UserPlus2 className="h-4 w-4 shrink-0" />
         </button>
@@ -220,6 +225,9 @@ function MessageBubble({ msg, mine, showSeconds, onContextMenu, chatPrefs }) {
   const bubbleBase = mine
     ? getMyBubbleColors(chatPrefs)
     : getPeerBubbleColors(chatPrefs);
+  const bubbleMeta = mine
+    ? getMyBubbleMeta(chatPrefs)
+    : 'text-[rgb(var(--orb-muted-rgb))]';
   const bubbleRadius = getBubbleRadius(chatPrefs);
   const fontCls = getFontSizeClass(chatPrefs);
 
@@ -260,9 +268,10 @@ function MessageBubble({ msg, mine, showSeconds, onContextMenu, chatPrefs }) {
       ) : (
         <div
           className={cx(
-            'max-w-[82%] px-4 py-3 text-[rgb(var(--orb-text-rgb))] select-text shadow-sm relative',
+            'max-w-[75%] px-5 py-3 select-text relative',
+            mine ? 'shadow-lg shadow-indigo-500/10' : 'shadow-md',
             bubbleRadius, fontCls, bubbleBase,
-            mine ? 'rounded-br-[4px]' : 'rounded-bl-[4px]'
+            mine ? 'rounded-br-md' : 'rounded-bl-md text-[rgb(var(--orb-text-rgb))]'
           )}
           onContextMenu={handleContextMenu}
           onPointerDown={handlePointerDown}
@@ -274,17 +283,17 @@ function MessageBubble({ msg, mine, showSeconds, onContextMenu, chatPrefs }) {
           {isVoice ? (
             <VoicePlayer msgId={msg.id} voice={msg.voice} mine={mine} />
           ) : (
-            <div className="whitespace-pre-wrap break-words">{msg.text}</div>
+            <div className="whitespace-pre-wrap break-words leading-relaxed">{msg.text}</div>
           )}
-          <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-[rgb(var(--orb-muted-rgb))]">
+          <div className={cx('mt-1 flex items-center gap-1 text-[11px]', bubbleMeta, mine ? 'justify-end' : 'justify-start')}>
             <span>
               {msg.editedAt ? <span className="mr-1 italic">ред.</span> : null}
               {formatTime(msg.ts, showSeconds)}
             </span>
             {mine ? (
-              <span className="inline-flex items-center gap-1.5">
-                <DeliveryIcon delivery={msg.delivery} />
-                {msg.delivery === 'queued' ? <span className="text-[rgb(var(--orb-muted-rgb))]">в очереди</span> : null}
+              <span className="ml-1 inline-flex items-center gap-1">
+                <DeliveryIcon delivery={msg.delivery} mine />
+                {msg.delivery === 'queued' ? <span>в очереди</span> : null}
               </span>
             ) : null}
           </div>
@@ -294,11 +303,12 @@ function MessageBubble({ msg, mine, showSeconds, onContextMenu, chatPrefs }) {
   );
 }
 
-function DeliveryIcon({ delivery }) {
-  if (delivery === 'queued') return <Clock className="h-3.5 w-3.5 text-[rgb(var(--orb-muted-rgb))]" />;
-  if (delivery === 'sent') return <Check className="h-3.5 w-3.5 text-[rgb(var(--orb-muted-rgb))]" />;
-  if (delivery === 'delivered') return <CheckCheck className="h-3.5 w-3.5 text-[rgb(var(--orb-muted-rgb))]" />;
-  if (delivery === 'read') return <CheckCheck className="h-3.5 w-3.5 text-[rgb(var(--orb-accent-rgb))]" />;
+function DeliveryIcon({ delivery, mine }) {
+  const base = mine ? 'h-3.5 w-3.5 opacity-70' : 'h-3.5 w-3.5 text-[rgb(var(--orb-muted-rgb))]';
+  if (delivery === 'queued') return <Clock className={base} />;
+  if (delivery === 'sent') return <Check className={base} />;
+  if (delivery === 'delivered') return <CheckCheck className={base} />;
+  if (delivery === 'read') return <CheckCheck className={cx(mine ? 'h-3.5 w-3.5 text-blue-200' : 'h-3.5 w-3.5 text-[rgb(var(--orb-accent-rgb))]')} />;
   return null;
 }
 
@@ -329,7 +339,7 @@ function MessageContextMenu({ menu, onClose, onReply, onEdit, onCopy, onDeleteMe
       initial={{ opacity: 0, scale: 0.96, y: -4 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.12 }}
-      className="fixed z-[80] w-[200px] rounded-2xl border border-[rgb(var(--orb-border-rgb))] bg-[rgb(var(--orb-bg-rgb))]/95 p-1 shadow-[0_12px_40px_rgba(0,0,0,0.4)] backdrop-blur"
+      className="fixed z-[80] w-[200px] rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/95 p-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl ring-1 ring-white/[0.08]"
       style={{ left: x, top: y }}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -745,9 +755,9 @@ export default function Chats() {
         <ConnectBar onConnect={peer.connect} />
       </div>
       <div className="px-4 pt-3">
-        <div className="flex items-center justify-between gap-2 rounded-xl bg-[rgb(var(--orb-surface-rgb))]/30 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-2 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-purple-600/10 px-3 py-2.5 ring-1 ring-indigo-500/15">
           <div className="min-w-0">
-            <div className="text-[10px] font-medium tracking-wider text-[rgb(var(--orb-muted-rgb))] uppercase">Твой ID</div>
+            <div className="text-[10px] font-medium tracking-wider text-indigo-300 uppercase">Твой ID</div>
             <div className="mt-0.5 truncate font-mono text-xs text-[rgb(var(--orb-text-rgb))]">{peer.peerId || '…'}</div>
           </div>
           <button
@@ -761,7 +771,7 @@ export default function Chats() {
               } catch (_) {
               }
             }}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--orb-muted-rgb))] transition-colors duration-200 hover:text-[rgb(var(--orb-text-rgb))] disabled:opacity-40"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-indigo-300 transition-colors duration-200 hover:bg-indigo-500/10 hover:text-indigo-200 disabled:opacity-40"
             aria-label="Копировать ID"
             title="Копировать ID"
           >
@@ -843,8 +853,8 @@ export default function Chats() {
         </aside>
         {/* Mobile: full-screen chat list */}
         <section className="orb-page-bg flex min-w-0 flex-1 flex-col bg-[rgb(var(--orb-bg-rgb))] md:hidden">
-          <div className="flex items-center gap-3 border-b border-[rgb(var(--orb-border-rgb))]/50 bg-[rgb(var(--orb-bg-rgb))] px-4 py-2.5">
-            <MessageSquare className="h-5 w-5 text-[rgb(var(--orb-accent-rgb))]" />
+          <div className="flex items-center gap-3 border-b border-white/[0.06] bg-gradient-to-r from-indigo-500/5 to-purple-600/5 px-4 py-3">
+            <MessageSquare className="h-5 w-5 text-indigo-400" />
             <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">Чаты</div>
           </div>
           {Sidebar}
@@ -871,12 +881,12 @@ export default function Chats() {
         onTouchStart={handleSwipeTouchStart}
         onTouchEnd={handleSwipeTouchEnd}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-[rgb(var(--orb-border-rgb))]/50 bg-[rgb(var(--orb-bg-rgb))] px-4 py-2.5">
+        <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3 text-white">
           <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
               onClick={() => peer.setSelectedPeerId('')}
-              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-xl text-[rgb(var(--orb-muted-rgb))] transition-colors duration-200 hover:text-[rgb(var(--orb-text-rgb))]"
+              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-full text-white/80 transition-colors duration-200 hover:bg-white/20 hover:text-white"
               aria-label="Назад к списку чатов"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -887,13 +897,13 @@ export default function Chats() {
                 if (!activeId) return;
                 setProfileOpen(true);
               }}
-              className="flex min-w-0 items-center gap-3 rounded-xl px-2 py-1 transition-colors duration-200 hover:bg-[rgb(var(--orb-surface-rgb))]/30"
+              className="flex min-w-0 items-center gap-3 rounded-xl px-2 py-1 transition-colors duration-200 hover:bg-white/10"
               aria-label="Открыть профиль"
             >
-              <Avatar profile={activeProfile} fallback={headerName} />
+              <Avatar profile={activeProfile} fallback={headerName} online={peer.peers.find((p) => p.id === activeId)?.status === 'online'} />
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-[rgb(var(--orb-text-rgb))]">{headerName}</div>
-                <div className="text-[11px] text-[rgb(var(--orb-muted-rgb))]">{peer.connectionStatusByPeer.get(activeId) || ''}</div>
+                <div className="truncate text-sm font-semibold text-white">{headerName}</div>
+                <div className="text-[11px] text-white/70">{peer.connectionStatusByPeer.get(activeId) || ''}</div>
               </div>
             </button>
           </div>
@@ -906,11 +916,11 @@ export default function Chats() {
                 if (!activeId) return;
                 peer.call.startCall(activeId, { videoEnabled: false });
               }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[rgb(var(--orb-muted-rgb))] transition-colors duration-200 hover:text-[rgb(var(--orb-text-rgb))] disabled:opacity-40"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/80 transition-colors duration-200 hover:bg-white/20 hover:text-white disabled:opacity-40"
               aria-label="Аудиозвонок"
               title="Аудиозвонок"
             >
-              <Phone className="h-[18px] w-[18px]" />
+              <Phone className="h-5 w-5" />
             </button>
             <button
               type="button"
@@ -920,17 +930,17 @@ export default function Chats() {
                 if (!activeId) return;
                 peer.call.startCall(activeId, { videoEnabled: true });
               }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[rgb(var(--orb-muted-rgb))] transition-colors duration-200 hover:text-[rgb(var(--orb-text-rgb))] disabled:opacity-40"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/80 transition-colors duration-200 hover:bg-white/20 hover:text-white disabled:opacity-40"
               aria-label="Видеозвонок"
               title="Видеозвонок"
             >
-              <Video className="h-[18px] w-[18px]" />
+              <Video className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <div ref={scrollRef} className="orb-content-scrim chat-bg-pattern orb-scroll flex-1 overflow-y-auto px-5 py-5">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <div ref={scrollRef} className="orb-content-scrim orb-scroll flex-1 overflow-y-auto bg-gradient-to-b from-[rgb(var(--orb-bg-rgb))] to-indigo-950/20 px-6 py-5">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
             {loadingMore ? <div className="py-1 text-center text-xs text-[rgb(var(--orb-muted-rgb))]">Загрузка…</div> : null}
             {!hasMore && messages.length ? <div className="py-1 text-center text-[11px] text-[rgb(var(--orb-muted-rgb))]">Начало истории</div> : null}
             <AnimatePresence initial={false}>
@@ -948,21 +958,21 @@ export default function Chats() {
           </div>
         </div>
 
-        <div className="relative border-t border-[rgb(var(--orb-border-rgb))]/50 bg-[rgb(var(--orb-bg-rgb))] px-4 pb-[max(10px,env(safe-area-inset-bottom))] pt-2.5">
+        <div className="relative border-t border-white/[0.06] bg-[rgb(var(--orb-bg-rgb))] px-4 pb-[max(10px,env(safe-area-inset-bottom))] pt-3">
           <AnimatePresence>
             {activeId && peer.typingByPeer?.[activeId] ? (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, transition: { duration: 0.1 } }}
-                className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-t-xl bg-[rgb(var(--orb-surface-rgb))]/80 px-4 py-1.5 text-[11px] font-medium text-[rgb(var(--orb-accent-rgb))] backdrop-blur-md shadow-lg"
+                className="absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full bg-white/[0.08] px-4 py-2 text-[11px] font-medium text-indigo-300 backdrop-blur-md shadow-lg ring-1 ring-white/[0.06]"
               >
                 <div className="flex gap-1">
-                  <motion.span animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--orb-accent-rgb))]" />
-                  <motion.span animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--orb-accent-rgb))]" />
-                  <motion.span animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--orb-accent-rgb))]" />
+                  <motion.span animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} className="h-2 w-2 rounded-full bg-indigo-400" />
+                  <motion.span animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="h-2 w-2 rounded-full bg-indigo-400" />
+                  <motion.span animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="h-2 w-2 rounded-full bg-purple-400" />
                 </div>
-                <span>{headerName} набирает сообщение...</span>
+                <span>{headerName} печатает...</span>
               </motion.div>
             ) : null}
           </AnimatePresence>
@@ -1022,11 +1032,11 @@ export default function Chats() {
                     setStickerOpen((v) => !v);
                   }}
                   disabled={!activeId}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[rgb(var(--orb-muted-rgb))] transition-colors duration-200 hover:text-[rgb(var(--orb-text-rgb))] disabled:opacity-40"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-indigo-400 transition-colors duration-200 hover:bg-indigo-500/10 disabled:opacity-40"
                   aria-label="Стикеры"
                   title="Стикеры"
                 >
-                  <Smile className="h-4 w-4" />
+                  <Smile className="h-5 w-5" />
                 </button>
 
                 <textarea
@@ -1034,9 +1044,9 @@ export default function Chats() {
                   value={draft}
                   onChange={(e) => updateDraft(e.target.value)}
                   rows={1}
-                  placeholder={activeId ? (editing ? 'Изменить сообщение…' : 'Сообщение…') : 'Выберите контакт…'}
+                  placeholder={activeId ? (editing ? 'Изменить сообщение…' : 'Напишите сообщение...') : 'Выберите контакт…'}
                   disabled={!activeId}
-                  className="min-h-[42px] flex-1 resize-none overflow-hidden rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/40 px-4 py-2.5 text-sm text-[rgb(var(--orb-text-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] focus:outline-none transition-colors duration-200 disabled:opacity-40"
+                  className="min-h-[42px] flex-1 resize-none overflow-hidden rounded-full bg-white/[0.06] px-5 py-2.5 text-[15px] text-[rgb(var(--orb-text-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] focus:outline-none focus:bg-white/[0.09] focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200 disabled:opacity-40"
                   onFocus={handleComposerFocus}
                   onBlur={() => {
                     if (!activeId) return;
@@ -1060,14 +1070,15 @@ export default function Chats() {
                 />
 
                 {draft.trim() || editing ? (
-                  <button
+                  <motion.button
                     type="button"
+                    whileTap={{ scale: 0.95 }}
                     onClick={send}
                     disabled={!activeId}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--orb-accent-rgb))] text-white transition-colors duration-200 active:scale-95 disabled:opacity-40"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full orb-gradient text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:shadow-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Send className="h-4 w-4" />
-                  </button>
+                    <Send className="h-5 w-5" />
+                  </motion.button>
                 ) : (
                   <VoiceButton
                     disabled={!activeId}

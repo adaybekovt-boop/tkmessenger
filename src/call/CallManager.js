@@ -74,6 +74,7 @@ export class CallManager extends MicroEmitter {
 
     this._state = createInitialCallState();
     this._disposed = false;
+    this._ending = false;
     this._callTimeout = null;
   }
 
@@ -160,6 +161,10 @@ export class CallManager extends MicroEmitter {
     try {
       this.channel = CallChannel.outgoing(peer, rid, stream);
     } catch (err) {
+      // Stream was already added to the pool at line above, but end() may not
+      // clean it up if the state machine is in an unexpected state. Explicitly
+      // stop tracks to guarantee the camera/mic LED turns off.
+      try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
       this._reportError(err);
       await this.end();
       return;
@@ -255,7 +260,8 @@ export class CallManager extends MicroEmitter {
   }
 
   async end() {
-    if (this._state.status === CallStatus.IDLE) return;
+    if (this._state.status === CallStatus.IDLE || this._ending) return;
+    this._ending = true;
 
     // Clear outgoing-call timeout.
     if (this._callTimeout) {
@@ -275,6 +281,7 @@ export class CallManager extends MicroEmitter {
       remoteId: '',
       screenSharing: false
     });
+    this._ending = false;
     this.emit('ended');
   }
 

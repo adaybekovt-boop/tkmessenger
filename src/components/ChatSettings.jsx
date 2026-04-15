@@ -9,7 +9,7 @@ function cx(...v) {
 // ─── Bubble style presets ────────────────────────────────────────────────────
 
 const BUBBLE_STYLES = [
-  { id: 'rounded',  label: 'Округлый',     radius: 'rounded-3xl' },
+  { id: 'rounded',  label: 'Округлый',     radius: 'rounded-[20px]' },
   { id: 'soft',     label: 'Мягкий',       radius: 'rounded-2xl' },
   { id: 'square',   label: 'Квадратный',   radius: 'rounded-lg' },
   { id: 'bubble',   label: 'Пузырь',       radius: 'rounded-[1.75rem]' },
@@ -18,20 +18,21 @@ const BUBBLE_STYLES = [
 // ─── Color presets ───────────────────────────────────────────────────────────
 
 const MY_COLOR_PRESETS = [
-  { id: 'accent',  label: 'Акцент',   bg: 'bg-[#1e2a38]', ring: 'ring-[#2a3a4a]' },
-  { id: 'blue',    label: 'Синий',    bg: 'bg-blue-500/15',    ring: 'ring-blue-500/25' },
-  { id: 'violet',  label: 'Фиолет',  bg: 'bg-violet-500/15',  ring: 'ring-violet-500/25' },
-  { id: 'emerald', label: 'Изумруд', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/25' },
-  { id: 'rose',    label: 'Роза',     bg: 'bg-rose-500/15',    ring: 'ring-rose-500/25' },
-  { id: 'amber',   label: 'Янтарь',  bg: 'bg-amber-500/15',   ring: 'ring-amber-500/25' },
+  { id: 'gradient', label: 'Градиент', bg: 'bg-gradient-to-br from-indigo-500 to-purple-600', ring: '', text: 'text-white', meta: 'text-white/60' },
+  { id: 'accent',   label: 'Акцент',   bg: 'bg-[rgb(var(--orb-accent-rgb))]/20', ring: 'ring-[rgb(var(--orb-accent-rgb))]/30', text: '', meta: '' },
+  { id: 'blue',     label: 'Синий',    bg: 'bg-blue-500/15',    ring: 'ring-blue-500/25', text: '', meta: '' },
+  { id: 'violet',   label: 'Фиолет',  bg: 'bg-violet-500/15',  ring: 'ring-violet-500/25', text: '', meta: '' },
+  { id: 'emerald',  label: 'Изумруд', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/25', text: '', meta: '' },
+  { id: 'rose',     label: 'Роза',     bg: 'bg-rose-500/15',    ring: 'ring-rose-500/25', text: '', meta: '' },
+  { id: 'amber',    label: 'Янтарь',  bg: 'bg-amber-500/15',   ring: 'ring-amber-500/25', text: '', meta: '' },
 ];
 
 const PEER_COLOR_PRESETS = [
-  { id: 'default', label: 'По умолч.', bg: 'bg-[#1a1a1a]', ring: 'ring-[#2a2a2e]' },
-  { id: 'slate',   label: 'Сланец',   bg: 'bg-slate-500/12',   ring: 'ring-slate-500/20' },
-  { id: 'zinc',    label: 'Цинк',     bg: 'bg-zinc-500/12',    ring: 'ring-zinc-500/20' },
-  { id: 'stone',   label: 'Камень',   bg: 'bg-stone-500/12',   ring: 'ring-stone-500/20' },
-  { id: 'sky',     label: 'Небо',     bg: 'bg-sky-500/10',     ring: 'ring-sky-500/20' },
+  { id: 'glass',   label: 'Стекло',    bg: 'bg-white/[0.07]',    ring: 'ring-white/[0.08]' },
+  { id: 'default', label: 'Тёмный',    bg: 'bg-[#16162a]',       ring: 'ring-[#2a2a45]' },
+  { id: 'slate',   label: 'Сланец',    bg: 'bg-slate-500/12',    ring: 'ring-slate-500/20' },
+  { id: 'zinc',    label: 'Цинк',      bg: 'bg-zinc-500/12',     ring: 'ring-zinc-500/20' },
+  { id: 'stone',   label: 'Камень',    bg: 'bg-stone-500/12',    ring: 'ring-stone-500/20' },
 ];
 
 const FONT_SIZES = [
@@ -46,24 +47,34 @@ const FONT_SIZES = [
 
 export function getBubbleRadius(prefs) {
   const style = BUBBLE_STYLES.find((s) => s.id === prefs?.bubbleStyle);
-  return style?.radius || 'rounded-3xl';
+  return style?.radius || 'rounded-[20px]';
 }
 
 export function getMyBubbleColors(prefs) {
   const preset = MY_COLOR_PRESETS.find((p) => p.id === prefs?.myColor);
-  if (preset) return `${preset.bg} ring-1 ${preset.ring}`;
-  return 'bg-[#1e2a38] ring-1 ring-[#2a3a4a]';
+  if (preset) {
+    const parts = [preset.bg];
+    if (preset.ring) parts.push('ring-1', preset.ring);
+    if (preset.text) parts.push(preset.text);
+    return parts.join(' ');
+  }
+  return 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white';
+}
+
+export function getMyBubbleMeta(prefs) {
+  const preset = MY_COLOR_PRESETS.find((p) => p.id === prefs?.myColor);
+  return preset?.meta || 'text-white/60';
 }
 
 export function getPeerBubbleColors(prefs) {
   const preset = PEER_COLOR_PRESETS.find((p) => p.id === prefs?.peerColor);
   if (preset) return `${preset.bg} ring-1 ${preset.ring}`;
-  return 'bg-[#1a1a1a] ring-1 ring-[#2a2a2e]';
+  return 'bg-white/[0.07] ring-1 ring-white/[0.08] shadow-md';
 }
 
 export function getFontSizeClass(prefs) {
   const size = FONT_SIZES.find((s) => s.id === prefs?.fontSize);
-  return size?.cls || 'text-sm';
+  return size?.cls || 'text-[15px]';
 }
 
 // ─── Toggle ──────────────────────────────────────────────────────────────────
@@ -92,12 +103,13 @@ export default function ChatSettings({ chatPrefs, onChange }) {
   const update = (patch) => onChange({ ...chatPrefs, ...patch });
 
   const currentBubble = chatPrefs.bubbleStyle || 'rounded';
-  const currentMyColor = chatPrefs.myColor || 'accent';
-  const currentPeerColor = chatPrefs.peerColor || 'default';
+  const currentMyColor = chatPrefs.myColor || 'gradient';
+  const currentPeerColor = chatPrefs.peerColor || 'glass';
   const currentFontSize = chatPrefs.fontSize || 'sm';
 
   const bubbleRadius = getBubbleRadius(chatPrefs);
   const myColors = getMyBubbleColors(chatPrefs);
+  const myMeta = getMyBubbleMeta(chatPrefs);
   const peerColors = getPeerBubbleColors(chatPrefs);
   const fontCls = getFontSizeClass(chatPrefs);
 
@@ -112,22 +124,22 @@ export default function ChatSettings({ chatPrefs, onChange }) {
       {/* ── Live preview ─────────────────────────────────────────────────── */}
       <div className="rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/35 p-4 ring-1 ring-[rgb(var(--orb-border-rgb))]">
         <div className="text-xs font-semibold tracking-wide text-[rgb(var(--orb-muted-rgb))]">ПРЕДПРОСМОТР</div>
-        <div className="mt-3 grid gap-2">
+        <div className="mt-3 grid gap-3">
           <div className="flex justify-start">
-            <div className={cx('max-w-[92%] px-4 py-3 text-[rgb(var(--orb-text-rgb))]', bubbleRadius, peerColors, fontCls)}>
-              <div>Привет! Как дела?</div>
+            <div className={cx('max-w-[92%] px-5 py-3 text-[rgb(var(--orb-text-rgb))] shadow-md', bubbleRadius, 'rounded-bl-md', peerColors, fontCls)}>
+              <div className="leading-relaxed">Привет! Как дела?</div>
               <div className="mt-1 text-[11px] text-[rgb(var(--orb-muted-rgb))]">{timeStr}</div>
             </div>
           </div>
           <div className="flex justify-end">
-            <div className={cx('max-w-[92%] px-4 py-3 text-[rgb(var(--orb-text-rgb))]', bubbleRadius, myColors, fontCls)}>
-              <div>Отлично, работаю над проектом!</div>
-              <div className="mt-1 text-[11px] text-[rgb(var(--orb-muted-rgb))]">{timeStr}</div>
+            <div className={cx('max-w-[92%] px-5 py-3', bubbleRadius, 'rounded-br-md', myColors, fontCls)}>
+              <div className="leading-relaxed">Отлично, работаю над проек��ом!</div>
+              <div className={cx('mt-1 text-[11px]', myMeta || 'text-[rgb(var(--orb-muted-rgb))]')}>{timeStr}</div>
             </div>
           </div>
           <div className="flex justify-start">
-            <div className={cx('max-w-[92%] px-4 py-3 text-[rgb(var(--orb-text-rgb))]', bubbleRadius, peerColors, fontCls)}>
-              <div>Звучит здорово!</div>
+            <div className={cx('max-w-[92%] px-5 py-3 text-[rgb(var(--orb-text-rgb))] shadow-md', bubbleRadius, 'rounded-bl-md', peerColors, fontCls)}>
+              <div className="leading-relaxed">Звучит здорово!</div>
               <div className="mt-1 text-[11px] text-[rgb(var(--orb-muted-rgb))]">{timeStr}</div>
             </div>
           </div>

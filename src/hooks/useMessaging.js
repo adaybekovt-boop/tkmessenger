@@ -162,7 +162,12 @@ export function useMessaging({ peerIdRef, getConn, sendEncrypted, sendEncryptedE
     const currentPeerId = peerIdRef.current;
     const conn = getConn(normalized, 'reliable');
     const ts = now();
-    const msgId = `${currentPeerId}:${ts}:${Math.random().toString(16).slice(2)}`;
+    // Use crypto.randomUUID for collision-resistant IDs. Math.random has
+    // poor resolution on mobile and can collide on rapid sends.
+    const rnd = typeof crypto?.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+    const msgId = `${currentPeerId}:${ts}:${rnd}`;
 
     const msgType = options.type || 'text';
     const text = msgType === 'text' ? String(options.text || '').trim() : String(options.text || '');
@@ -177,23 +182,33 @@ export function useMessaging({ peerIdRef, getConn, sendEncrypted, sendEncryptedE
     if (msgType === 'voice' && options.voice) {
       const v = options.voice;
       try {
+        let blobSaved = false;
         if (v.blob) {
           await saveVoiceBlob(msgId, v.blob, {
             mime: v.mime || v.blob.type,
             duration: v.duration,
             waveform: v.waveform
           });
+          blobSaved = true;
         }
-        uiVoice = {
-          duration: Number(v.duration) || 0,
-          mime: v.mime || v.blob?.type || 'audio/webm',
-          waveform: Array.isArray(v.waveform) ? v.waveform : []
-        };
-        if (v.blob) {
+        // Only populate uiVoice if the blob was saved successfully,
+        // otherwise the recipient will see a broken voice player.
+        if (blobSaved || !v.blob) {
+          uiVoice = {
+            duration: Number(v.duration) || 0,
+            mime: v.mime || v.blob?.type || 'audio/webm',
+            waveform: Array.isArray(v.waveform) ? v.waveform : []
+          };
+        }
+        if (v.blob && blobSaved) {
           const b64 = await blobToBase64(v.blob);
           wireVoice = { ...uiVoice, b64 };
         }
       } catch (_) {
+        // Voice blob save failed — send as text-only message instead of
+        // showing a broken voice player to the recipient.
+        uiVoice = null;
+        wireVoice = null;
       }
     }
 

@@ -38,6 +38,10 @@ const HKDF_SALT_TAG = 'orbits-wire-v2';
 // In-memory: peerId → session object.
 const sessions = new Map();
 
+// Buffer for ciphertexts that arrive before the ratchet is ready (race between
+// message arrival and acceptHello completion). Drained once the session is ready.
+const pendingInbound = new Map(); // peerId → [{wireStr, resolve, reject}]
+
 function createPendingReady() {
   let resolve;
   let reject;
@@ -122,7 +126,9 @@ async function persistSession(session) {
     updatedAt: Date.now()
   };
   // Serialize persistence per-session to avoid interleaving writes.
-  session.persistLock = session.persistLock.then(() => saveRatchetState(snapshot)).catch(() => {});
+  session.persistLock = session.persistLock.then(() => saveRatchetState(snapshot)).catch((err) => {
+    try { console.warn('[wire] persistSession failed — forward secrecy may degrade on reload', err); } catch (_) {}
+  });
   await session.persistLock;
 }
 
@@ -130,6 +136,12 @@ async function hydrateSession(peerId) {
   try {
     const row = await loadRatchetState(peerId);
     if (!row) return null;
+    // Validate critical fields before trusting the persisted state.
+    if (!row.dhKeyPair || !row.dhPubSpki || !row.rootKey) {
+      try { console.warn('[wire] hydrateSession: corrupted ratchet state for', peerId); } catch (_) {}
+      await deleteRatchetState(peerId).catch(() => {});
+      return null;
+    }
     const session = getOrCreateSession(peerId);
     session.role = row.role || null;
     session.state = {
@@ -252,6 +264,8 @@ export async function acceptHello(peerId, myPeerId, helloMsg) {
   session.ready = true;
   session.resolveReady?.({ peerId });
   await persistSession(session);
+  // Drain any ciphertexts that arrived before the handshake completed.
+  void drainPendingInbound(peerId);
   return { reply };
 }
 
@@ -295,7 +309,33 @@ export async function decryptInbound(peerId, wireStr) {
     // No state but ciphertext arrived: try to hydrate from IDB.
     await hydrateSession(peerId);
   }
-  if (!session.state) throw new Error('No ratchet state for peer');
+  if (!session.state) {
+    // Ratchet not ready yet — buffer the ciphertext and wait for acceptHello
+    // to complete. This avoids silently dropping messages that arrive before
+    // the handshake finishes (race condition on fresh connections).
+    return new Promise((resolve, reject) => {
+      if (!pendingInbound.has(peerId)) pendingInbound.set(peerId, []);
+      const queue = pendingInbound.get(peerId);
+      // Cap the queue to prevent unbounded growth from a misbehaving peer.
+      if (queue.length >= 64) {
+        reject(new Error('Too many buffered ciphertexts before handshake'));
+        return;
+      }
+      queue.push({ wireStr, resolve, reject });
+      // Auto-reject after 15s if handshake never completes.
+      setTimeout(() => {
+        const q = pendingInbound.get(peerId);
+        if (q) {
+          const idx = q.findIndex((e) => e.resolve === resolve);
+          if (idx !== -1) {
+            q.splice(idx, 1);
+            if (!q.length) pendingInbound.delete(peerId);
+            reject(new Error('No ratchet state for peer (timeout)'));
+          }
+        }
+      }, 15000);
+    });
+  }
   const envelope = decodeWire(wireStr);
   if (!envelope) throw new Error('Bad wire envelope');
   const { state, plaintext } = await ratchetDecrypt(session.state, envelope);
@@ -309,12 +349,35 @@ export async function decryptInbound(peerId, wireStr) {
   return JSON.parse(new TextDecoder().decode(plaintext));
 }
 
+/** Drain any ciphertexts that were buffered before the ratchet was ready. */
+async function drainPendingInbound(peerId) {
+  const queue = pendingInbound.get(peerId);
+  if (!queue || !queue.length) return;
+  pendingInbound.delete(peerId);
+  for (const entry of queue) {
+    try {
+      const result = await decryptInbound(peerId, entry.wireStr);
+      entry.resolve(result);
+    } catch (err) {
+      entry.reject(err);
+    }
+  }
+}
+
 /** Reset a session entirely (used by blockPeer, resetIdentity). */
 export async function teardownSession(peerId) {
   const s = sessions.get(peerId);
   if (s) {
     try { s.rejectReady?.(new Error('Session torn down')); } catch (_) {}
     sessions.delete(peerId);
+  }
+  // Reject and discard any buffered inbound ciphertexts.
+  const queue = pendingInbound.get(peerId);
+  if (queue) {
+    for (const entry of queue) {
+      try { entry.reject(new Error('Session torn down')); } catch (_) {}
+    }
+    pendingInbound.delete(peerId);
   }
   try { await deleteRatchetState(peerId); } catch (_) {}
 }

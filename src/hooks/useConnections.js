@@ -245,10 +245,22 @@ export function useConnections({ peerRef, peerIdRef, selectedPeerIdRef, localPro
       }).catch(() => {});
     };
 
+    // Remove any previously attached listeners to prevent accumulation
+    // when attachConn is called multiple times on the same conn (glare).
+    try {
+      conn.off('open', conn._orbHandlers?.onOpen);
+      conn.off('close', conn._orbHandlers?.onClose);
+      conn.off('error', conn._orbHandlers?.onError);
+      conn.off('data', conn._orbHandlers?.onData);
+    } catch (_) {}
+
     conn.on('open', onOpen);
     conn.on('close', onClose);
     conn.on('error', onError);
     conn.on('data', onData);
+
+    // Store handler refs so we can remove them on re-attach.
+    conn._orbHandlers = { onOpen, onClose, onError, onData };
   }, [connKey, handlersRef, peerIdRef, selectedPeerIdRef, localProfileRef, seenMsgIdsRef, setSelectedPeerId]);
 
   const openEphemeral = useCallback((targetId) => {

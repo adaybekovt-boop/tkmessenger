@@ -85,6 +85,12 @@ export class ScreenShareController {
    * @param {'user'|'environment'} [facingMode='user']
    */
   async stop(activeCall, facingMode = 'user') {
+    // Clear the onended handler before releasing — prevents stale callback
+    // firing on a track that was manually stopped.
+    const screenTrack = this.pool.screen?.getVideoTracks?.()?.[0];
+    if (screenTrack) {
+      try { screenTrack.onended = null; } catch (_) {}
+    }
     // Releasing the screen stream also stops its tracks via the pool.
     this.pool.setScreen(null);
 

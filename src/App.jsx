@@ -26,14 +26,17 @@ function TabButton({ active, icon: Icon, label, onClick }) {
       type="button"
       onClick={onClick}
       className={cx(
-        'flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 transition-colors duration-200 active:scale-95',
+        'flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 transition-all duration-200 active:scale-95',
         active
-          ? 'text-[rgb(var(--orb-text-rgb))]'
+          ? 'text-indigo-400'
           : 'text-[rgb(var(--orb-muted-rgb))] hover:text-[rgb(var(--orb-text-rgb))]'
       )}
     >
-      <Icon className="h-5 w-5" strokeWidth={active ? 2 : 1.5} />
-      <span className={cx('text-[10px] leading-tight', active ? 'font-semibold' : 'font-normal')}>{label}</span>
+      <div className="relative">
+        <Icon className="h-5 w-5" strokeWidth={active ? 2.2 : 1.5} />
+        {active ? <div className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-indigo-400" /> : null}
+      </div>
+      <span className={cx('mt-0.5 text-[10px] leading-tight', active ? 'font-semibold' : 'font-normal')}>{label}</span>
     </button>
   );
 }
@@ -102,7 +105,7 @@ function PeerStatusPill() {
   const text = peer.error ? `ошибка: ${peer.error}` : (labels[peer.status] || peer.status);
   if (!text || peer.status === 'connected') return null;
   return (
-    <div className="inline-flex items-center rounded-2xl bg-[rgb(var(--orb-danger-rgb))]/10 px-3 py-1 text-[11px] font-semibold text-[rgb(var(--orb-danger-rgb))] ring-1 ring-[rgb(var(--orb-danger-rgb))]/20">
+    <div className="inline-flex items-center rounded-full bg-[rgb(var(--orb-danger-rgb))]/10 px-3 py-1 text-[11px] font-semibold text-[rgb(var(--orb-danger-rgb))] ring-1 ring-[rgb(var(--orb-danger-rgb))]/20">
       {text}
     </div>
   );
@@ -321,102 +324,17 @@ export default function App() {
         }}
       >
         <CallOverlayMount />
-        <header className="flex h-12 items-center justify-between border-b border-[rgb(var(--orb-border-rgb))]/50 bg-[rgb(var(--orb-bg-rgb))] px-4">
-          <OrbitsLogo />
-          <PeerStatusPill />
-        </header>
 
-        {/* Phase 3.3 — Install Banner */}
-        <AnimatePresence>
-          {canInstall && !installBannerDismissed ? (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-              className="overflow-hidden border-b border-[rgb(var(--orb-border-rgb))]"
-            >
-              <div className="flex items-center justify-between gap-3 bg-[rgb(var(--orb-surface-rgb))]/40 px-4 py-2">
-                <div className="flex items-center gap-2 text-xs text-[rgb(var(--orb-text-rgb))]">
-                  <Download className="h-4 w-4 text-[rgb(var(--orb-muted-rgb))]" />
-                  <span>Установить на главный экран?</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { hapticTap(); void handleInstall(); }}
-                    className="rounded-lg bg-[rgb(var(--orb-accent-rgb))] px-3 py-1 text-[11px] font-medium text-white transition-colors duration-200"
-                  >
-                    Установить
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { localStorage.setItem('orbits_pwa_dismissed', '1'); setInstallBannerDismissed(true); }}
-                    className="inline-flex h-7 w-7 items-center justify-center text-[rgb(var(--orb-muted-rgb))]"
-                    aria-label="Закрыть"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-
-        {/* SW Update Banner */}
-        <AnimatePresence>
-          {swState.needRefresh ? (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-              className="overflow-hidden border-b border-[rgb(var(--orb-border-rgb))]"
-            >
-              <div className="flex items-center justify-between gap-3 bg-[rgb(var(--orb-surface-rgb))]/40 px-4 py-2">
-                <div className="text-xs text-[rgb(var(--orb-text-rgb))]">Доступна новая версия</div>
-                <button
-                  type="button"
-                  onClick={() => { hapticTap(); reloadNowFn(); }}
-                  className="rounded-lg bg-[rgb(var(--orb-success-rgb))] px-3 py-1 text-[11px] font-medium text-white transition-colors duration-200"
-                >
-                  Обновить
-                </button>
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-
-        {/* Phase 2.3 — Storage Warning */}
-        <AnimatePresence>
-          {storageWarning ? (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-              className="overflow-hidden border-b border-[rgb(var(--orb-border-rgb))]"
-            >
-              <div className="flex items-center justify-between gap-3 bg-[rgb(var(--orb-danger-rgb))]/10 px-4 py-2">
-                <div className="text-xs text-[rgb(var(--orb-text-rgb))]">
-                  ⚠️ Хранилище заполнено на {Math.round((storageWarning.ratio || 0) * 100)}% ({storageWarning.usageMB}MB / {storageWarning.quotaMB}MB). Очистите старые сообщения в настройках.
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setStorageWarning(null)}
-                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out active:scale-95"
-                  aria-label="Закрыть"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        {/* Floating status pill — only shows when disconnected */}
+        <div className="pointer-events-none absolute left-0 right-0 top-[max(4px,env(safe-area-inset-top))] z-30 flex justify-center">
+          <div className="pointer-events-auto">
+            <PeerStatusPill />
+          </div>
+        </div>
 
         <main
           className="w-full overflow-hidden"
-          style={{ height: 'calc((var(--orb-vvh, 1vh) * 100) - 48px - var(--orb-nav-h, 64px))' }}
+          style={{ height: 'calc((var(--orb-vvh, 1vh) * 100) - var(--orb-nav-h, 64px))' }}
         >
           <div className="h-full w-full relative">
             <motion.div
@@ -428,11 +346,99 @@ export default function App() {
             >
               {view}
             </motion.div>
+
+            {/* Floating banners overlay */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 px-4 pb-3">
+              <AnimatePresence>
+                {canInstall && !installBannerDismissed ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="pointer-events-auto w-full max-w-md rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/90 px-4 py-3 shadow-xl backdrop-blur-xl ring-1 ring-white/[0.08]"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-[rgb(var(--orb-text-rgb))]">
+                        <Download className="h-4 w-4 text-indigo-400" />
+                        <span>Установить на главный экран?</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { hapticTap(); void handleInstall(); }}
+                          className="rounded-full orb-gradient px-4 py-1.5 text-[11px] font-medium text-white shadow-lg shadow-indigo-500/20 transition-all duration-200"
+                        >
+                          Установить
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { localStorage.setItem('orbits_pwa_dismissed', '1'); setInstallBannerDismissed(true); }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[rgb(var(--orb-muted-rgb))] hover:text-[rgb(var(--orb-text-rgb))]"
+                          aria-label="Закрыть"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {swState.needRefresh ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="pointer-events-auto w-full max-w-md rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/90 px-4 py-3 shadow-xl backdrop-blur-xl ring-1 ring-white/[0.08]"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs text-[rgb(var(--orb-text-rgb))]">Доступна новая версия</div>
+                      <button
+                        type="button"
+                        onClick={() => { hapticTap(); reloadNowFn(); }}
+                        className="rounded-full bg-[rgb(var(--orb-success-rgb))] px-4 py-1.5 text-[11px] font-medium text-white transition-colors duration-200"
+                      >
+                        Обновить
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {storageWarning ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="pointer-events-auto w-full max-w-md rounded-2xl bg-[rgb(var(--orb-danger-rgb))]/10 px-4 py-3 shadow-xl backdrop-blur-xl ring-1 ring-[rgb(var(--orb-danger-rgb))]/20"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs text-[rgb(var(--orb-text-rgb))]">
+                        Хранилище: {Math.round((storageWarning.ratio || 0) * 100)}% ({storageWarning.usageMB}MB / {storageWarning.quotaMB}MB)
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setStorageWarning(null)}
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[rgb(var(--orb-muted-rgb))] active:scale-95"
+                        aria-label="Закрыть"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
           </div>
         </main>
 
         <nav
-          className="orb-nav-bar flex h-[64px] items-center gap-1 overflow-hidden border-t border-[rgb(var(--orb-border-rgb))]/50 bg-[rgb(var(--orb-bg-rgb))] px-6 pb-[max(8px,env(safe-area-inset-bottom))] pt-2"
+          className="orb-nav-bar flex h-[64px] items-center gap-1 overflow-hidden border-t border-white/[0.06] bg-[rgb(var(--orb-bg-rgb))]/95 px-6 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl"
           role="navigation"
           aria-label="Навигация"
         >

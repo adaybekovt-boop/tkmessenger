@@ -386,7 +386,7 @@ export async function getPendingMessages(peerId, limit = 200) {
 
   if (peerId) {
     const pid = String(peerId || '');
-    const range = IDBKeyRange.bound([pid, 'pending', 0], [pid, 'pending', Infinity]);
+    const range = IDBKeyRange.bound([pid, 'pending', 0], [pid, 'pending', Number.MAX_SAFE_INTEGER]);
     let cursor = await db.transaction('messages').store.index('peerId_status_timestamp').openCursor(range, 'next');
     while (cursor && results.length < limit) {
       results.push(cursor.value);
@@ -442,7 +442,7 @@ export async function clearPendingMessages(peerId = null) {
 
   if (peerId) {
     const pid = String(peerId);
-    const range = IDBKeyRange.bound([pid, 'pending', 0], [pid, 'pending', Infinity]);
+    const range = IDBKeyRange.bound([pid, 'pending', 0], [pid, 'pending', Number.MAX_SAFE_INTEGER]);
     let cursor = await tx.store.index('peerId_status_timestamp').openCursor(range, 'next');
     while (cursor) {
       try {

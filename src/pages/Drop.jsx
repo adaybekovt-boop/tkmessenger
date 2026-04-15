@@ -114,9 +114,11 @@ export default function Drop() {
       // catches it once the manager exists.
       dropRef.current.activate();
 
-      // Skip discovery polling while a transfer is active — we already
-      // have the connection we need and extra signaling would only add noise.
-      if (dropRef.current.state?.status === 'transferring') return;
+      // Skip discovery polling while a handshake or transfer is active —
+      // we already have the connection we need and extra signaling would
+      // only add noise (and could race with the state machine).
+      const s = dropRef.current.state?.status;
+      if (s === 'transferring' || s === 'requesting' || s === 'awaiting-consent' || s === 'done') return;
 
       // Connect to known contacts
       const peers = peerRef.current.peers || [];

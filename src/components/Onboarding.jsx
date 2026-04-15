@@ -131,7 +131,7 @@ export default function Onboarding() {
         style={{ height: 'calc(var(--orb-vvh, 1vh) * 100)', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="w-full max-w-[440px]">
-          <div className="orb-blur rounded-[28px] bg-[rgb(var(--orb-surface-rgb))]/30 p-5 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+          <div className="orb-blur rounded-[28px] bg-[rgb(var(--orb-surface-rgb))]/30 p-5 ring-1 ring-white/[0.08]">
             <div className="flex items-center gap-3">
               <OrbitsLogo />
               <div className="min-w-0">
@@ -148,7 +148,7 @@ export default function Onboarding() {
                   onChange={(e) => setUnlockPassword(e.target.value)}
                   type={showPass ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className="h-11 w-full rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out focus:ring-[rgb(var(--orb-accent-rgb))]/50"
+                  className="h-11 w-full rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out focus:ring-indigo-500/40 focus:border-indigo-500/30"
                 />
               </label>
 
@@ -161,7 +161,7 @@ export default function Onboarding() {
                     hapticTap();
                     setShowPass((v) => !v);
                   }}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-300 ease-in-out active:scale-95"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] transition-all duration-300 ease-in-out active:scale-95"
                   aria-label={showPass ? 'Скрыть пароль' : 'Показать пароль'}
                   title={showPass ? 'Скрыть пароль' : 'Показать пароль'}
                 >
@@ -182,7 +182,7 @@ export default function Onboarding() {
                     }
                   }}
                   className={cx(
-                    'inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--orb-accent-rgb))] px-4 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(59,130,246,0.25),0_0_28px_rgba(59,130,246,0.18)] transition-all duration-300 ease-in-out active:scale-95',
+                    'inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl orb-gradient px-4 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all duration-300 ease-in-out active:scale-95',
                     busy ? 'opacity-70' : ''
                   )}
                 >
@@ -215,7 +215,7 @@ export default function Onboarding() {
       style={{ height: 'calc(var(--orb-vvh, 1vh) * 100)', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="w-full max-w-[440px]">
-        <div className="orb-blur rounded-[28px] bg-[rgb(var(--orb-surface-rgb))]/30 p-5 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+        <div className="orb-blur rounded-[28px] bg-[rgb(var(--orb-surface-rgb))]/30 p-5 ring-1 ring-white/[0.08]">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <OrbitsLogo showText={false} />
@@ -231,7 +231,7 @@ export default function Onboarding() {
                   hapticTap();
                   setStep((s) => Math.max(0, s - 1));
                 }}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-300 ease-in-out active:scale-95"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] transition-all duration-300 ease-in-out active:scale-95"
                 aria-label="Назад"
                 title="Назад"
               >
@@ -245,8 +245,8 @@ export default function Onboarding() {
               <div
                 key={i}
                 className={cx(
-                  'h-1.5 flex-1 rounded-full ring-1 ring-[rgb(var(--orb-border-rgb))]',
-                  i <= step ? 'bg-[rgb(var(--orb-accent-rgb))]/55' : 'bg-[rgb(var(--orb-bg-rgb))]/25'
+                  'h-1.5 flex-1 rounded-full transition-all duration-300',
+                  i <= step ? 'orb-gradient shadow-sm shadow-indigo-500/20' : 'bg-white/[0.06] ring-1 ring-white/[0.06]'
                 )}
               />
             ))}
@@ -263,9 +263,9 @@ export default function Onboarding() {
                   transition={{ duration: 0.22, ease: 'easeOut' }}
                   className="grid gap-3"
                 >
-                  <div className="rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+                  <div className="rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-white/[0.08]">
                     <div className="flex items-start gap-3">
-                      <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/45 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+                      <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/45 ring-1 ring-white/[0.08]">
                         <ShieldCheck className="h-4 w-4 text-[rgb(var(--orb-text-rgb))]" />
                       </div>
                       <div>
@@ -281,7 +281,7 @@ export default function Onboarding() {
                       hapticTap();
                       void goNext();
                     }}
-                    className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[rgb(var(--orb-accent-rgb))] px-4 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(59,130,246,0.25),0_0_28px_rgba(59,130,246,0.18)] transition-all duration-300 ease-in-out active:scale-95"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-2xl orb-gradient px-4 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all duration-300 ease-in-out active:scale-95"
                   >
                     Начать
                   </button>
@@ -308,11 +308,11 @@ export default function Onboarding() {
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
                       placeholder="Например: Alex_77"
-                      className="h-11 w-full rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out focus:ring-[rgb(var(--orb-accent-rgb))]/50"
+                      className="h-11 w-full rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out focus:ring-indigo-500/40 focus:border-indigo-500/30"
                     />
                   </label>
 
-                  <div className="grid gap-2 rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+                  <div className="grid gap-2 rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-white/[0.08]">
                     <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">Пароль</div>
                     <div className="grid gap-2">
                       <input
@@ -320,14 +320,14 @@ export default function Onboarding() {
                         onChange={(e) => setPassword(e.target.value)}
                         type={showPass ? 'text' : 'password'}
                         placeholder="Минимум 8 символов"
-                        className="h-11 w-full rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out focus:ring-[rgb(var(--orb-accent-rgb))]/50"
+                        className="h-11 w-full rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out focus:ring-indigo-500/40 focus:border-indigo-500/30"
                       />
                       <input
                         value={confirm}
                         onChange={(e) => setConfirm(e.target.value)}
                         type={showPass ? 'text' : 'password'}
                         placeholder="Повтори пароль"
-                        className="h-11 w-full rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out focus:ring-[rgb(var(--orb-accent-rgb))]/50"
+                        className="h-11 w-full rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 px-4 text-sm text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] placeholder:text-[rgb(var(--orb-muted-rgb))] transition-all duration-300 ease-in-out focus:ring-indigo-500/40 focus:border-indigo-500/30"
                       />
                       <div className="flex items-center justify-between">
                         <div className="text-[11px] text-[rgb(var(--orb-muted-rgb))]">Сила: {passwordStrength(password)}/5</div>
@@ -337,7 +337,7 @@ export default function Onboarding() {
                             hapticTap();
                             setShowPass((v) => !v);
                           }}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 px-3 py-2 text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-300 ease-in-out active:scale-95"
+                          className="inline-flex items-center gap-2 rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 px-3 py-2 text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] transition-all duration-300 ease-in-out active:scale-95"
                         >
                           {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           {showPass ? 'Скрыть' : 'Показать'}
@@ -346,9 +346,9 @@ export default function Onboarding() {
                     </div>
                   </div>
 
-                  <div className="rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+                  <div className="rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-white/[0.08]">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/45 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+                      <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/45 ring-1 ring-white/[0.08]">
                         {avatarDataUrl ? <img alt="" src={avatarDataUrl} className="h-full w-full object-cover" /> : <ImagePlus className="h-4 w-4 text-[rgb(var(--orb-muted-rgb))]" />}
                       </div>
                       <div className="min-w-0">
@@ -357,7 +357,7 @@ export default function Onboarding() {
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/45 px-3 py-2 text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-300 ease-in-out active:scale-95">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/45 px-3 py-2 text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] transition-all duration-300 ease-in-out active:scale-95">
                         <input
                           type="file"
                           accept="image/*"
@@ -383,7 +383,7 @@ export default function Onboarding() {
                             hapticTap();
                             setAvatarDataUrl(null);
                           }}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 px-3 py-2 text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-300 ease-in-out active:scale-95"
+                          className="inline-flex items-center gap-2 rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 px-3 py-2 text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] transition-all duration-300 ease-in-out active:scale-95"
                         >
                           Убрать
                         </button>
@@ -407,7 +407,7 @@ export default function Onboarding() {
 
                   <button
                     type="submit"
-                    className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[rgb(var(--orb-accent-rgb))] px-4 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(59,130,246,0.25),0_0_28px_rgba(59,130,246,0.18)] transition-all duration-300 ease-in-out active:scale-95"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-2xl orb-gradient px-4 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all duration-300 ease-in-out active:scale-95"
                   >
                     Далее
                   </button>
@@ -430,7 +430,7 @@ export default function Onboarding() {
                   transition={{ duration: 0.22, ease: 'easeOut' }}
                   className="grid gap-3"
                 >
-                  <div className="rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+                  <div className="rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-white/[0.08]">
                     <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">Твой Peer ID</div>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <div className="min-w-0 truncate font-mono text-xs text-[rgb(var(--orb-text-rgb))]">{maskedPeerId}</div>
@@ -441,7 +441,7 @@ export default function Onboarding() {
                             hapticTap();
                             setRevealId((v) => !v);
                           }}
-                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-300 ease-in-out active:scale-95"
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/35 text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] transition-all duration-300 ease-in-out active:scale-95"
                           aria-label={revealId ? 'Скрыть Peer ID' : 'Показать Peer ID'}
                           title={revealId ? 'Скрыть' : 'Показать'}
                         >
@@ -458,7 +458,7 @@ export default function Onboarding() {
                             } catch (_) {
                             }
                           }}
-                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/50 text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-300 ease-in-out active:scale-95 disabled:opacity-60"
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/50 text-[rgb(var(--orb-text-rgb))] ring-1 ring-white/[0.08] transition-all duration-300 ease-in-out active:scale-95 disabled:opacity-60"
                           aria-label="Копировать Peer ID"
                           title={revealId ? 'Копировать' : 'Сначала нажми Показать'}
                         >
@@ -475,7 +475,7 @@ export default function Onboarding() {
                     type="submit"
                     disabled={busy}
                     className={cx(
-                      'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--orb-accent-rgb))] px-4 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(59,130,246,0.25),0_0_28px_rgba(59,130,246,0.18)] transition-all duration-300 ease-in-out active:scale-95',
+                      'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl orb-gradient px-4 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all duration-300 ease-in-out active:scale-95',
                       busy ? 'opacity-70' : ''
                     )}
                   >

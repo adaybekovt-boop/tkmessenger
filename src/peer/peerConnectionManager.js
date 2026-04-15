@@ -73,6 +73,8 @@ export class PeerConnectionManager {
       const delay = computeBackoffMs(attempt);
       self.cb.setStatus?.(reason === 'offline' ? 'disconnected' : 'connecting');
       self.reconnectTimeout = setTimeout(() => {
+        // Re-check: a file transfer may have started between schedule and fire.
+        if (self._isDropInProgressRef.current) return;
         const cur = self.peer;
         if (!cur || cur.destroyed) return;
         // Peer auto-recovered (e.g. after a transient listAllPeers error)
@@ -114,13 +116,14 @@ export class PeerConnectionManager {
       if (err?.type === 'unavailable-id') {
         if (self.reconnectTimeout) clearTimeout(self.reconnectTimeout);
         const attempt = self.reconnectAttempt;
-        self.reconnectAttempt = Math.min(20, attempt + 1);
+        // Cap at 15 so the delay plateaus instead of growing indefinitely.
+        self.reconnectAttempt = Math.min(15, attempt + 1);
 
         // Fast phase: 1.5-2.5s interval for first ~16s
-        // Slow phase: 3-5s interval after that
+        // Slow phase: fixed 5s after that (don't keep incrementing)
         const delay = attempt < 8
           ? 1500 + Math.floor(Math.random() * 1000)
-          : 3000 + Math.floor(Math.random() * 2000);
+          : 5000;
 
         self.cb.setStatus?.('connecting');
 

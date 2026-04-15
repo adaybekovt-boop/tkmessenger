@@ -100,7 +100,10 @@ export class DropManager extends MicroEmitter {
 
   activate() {
     if (this._disposed) return;
-    if (this._state.status === DropStatus.BEACON) return;
+    // Only activate from IDLE or ERROR — never interrupt an active
+    // handshake, consent prompt, or transfer in progress.
+    const s = this._state.status;
+    if (s !== DropStatus.IDLE && s !== DropStatus.ERROR) return;
     if (!this._transitionTo(DropStatus.BEACON, { beaconActive: true, error: null })) return;
     this._listener.start();
     if (this._state.visibilityEnabled) this._publisher.start();

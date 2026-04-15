@@ -38,8 +38,10 @@ export function resolveGlare({
   if (currentStatus === CallStatus.IN_CALL) return 'reject-busy';
 
   // Glare: we are dialing the exact peer who is now dialing us.
+  // Use plain < comparison (lexicographic by code point) instead of
+  // localeCompare so the result is deterministic regardless of locale.
   if (currentStatus === CallStatus.CALLING && currentRemoteId === callerId) {
-    const keepOutgoing = Boolean(myPeerId) && myPeerId.localeCompare(String(callerId)) < 0;
+    const keepOutgoing = Boolean(myPeerId) && String(myPeerId) < String(callerId);
     return keepOutgoing ? 'keep-outgoing' : 'accept-incoming';
   }
 

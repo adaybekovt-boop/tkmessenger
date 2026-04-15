@@ -334,6 +334,7 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
 
   useEffect(() => {
     if (!micTesting) return;
+    let active = true;
     let ctx = null;
     let analyser = null;
     let source = null;
@@ -350,6 +351,12 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
           video: false
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        // Component unmounted while getUserMedia was pending — stop the stream
+        // immediately and bail out to prevent state updates on unmounted component.
+        if (!active) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         micStreamRef.current = stream;
         setMicGranted(true);
         ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -375,6 +382,7 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
     void start();
 
     return () => {
+      active = false;
       try {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
       } catch (_) {
