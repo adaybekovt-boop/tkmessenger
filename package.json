@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^6.0.0",
-    "@capawesome/capacitor-file-picker": "^8.0.2",
+    "@capawesome/capacitor-file-picker": "^6.2.0",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "framer-motion": "^11.3.31",
