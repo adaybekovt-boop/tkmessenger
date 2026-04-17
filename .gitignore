@@ -1,0 +1,19 @@
+node_modules/
+dist/
+release/
+.env
+*.log
+.DS_Store
+Thumbs.db
+*.pem
+*.key
+
+# Mobile
+android/
+ios/
+capacitor.config.ts.timestamp*
+
+# Rust / Wasm (built by CI)
+target/
+pkg/
+Cargo.lock
