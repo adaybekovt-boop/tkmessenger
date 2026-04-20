@@ -670,7 +670,12 @@ export default function Chats() {
     });
   }, []);
 
-  useEffect(() => {
+  // Auto-grow the composer textarea. useLayoutEffect (not useEffect) so
+  // the measurement and re-assignment happen in the same frame as the
+  // keystroke — if this runs post-paint the user briefly sees a
+  // 0px-tall textarea before it snaps back to full height, and the chat
+  // area below pumps up / down on every character.
+  useLayoutEffect(() => {
     const el = composerRef.current;
     if (!el) return;
     el.style.height = '0px';
@@ -1136,6 +1141,12 @@ export default function Chats() {
           ref={scrollRef}
           data-orb-chat-scroll
           className="orb-content-scrim orb-scroll flex-1 overflow-y-auto bg-gradient-to-b from-[rgb(var(--orb-bg-rgb))] to-[rgb(var(--orb-surface-rgb))]/40 px-6 py-5"
+          // overscroll-behavior: contain + overflow-anchor: none keeps
+          // the iOS/Android rubber-band bounce from escaping to the page
+          // shell, and stops the browser from auto-scrolling when new
+          // messages push the content. Both are the source of the
+          // "все ходит ходуном" feel while chatting on mobile.
+          style={{ overscrollBehavior: 'contain', overflowAnchor: 'none' }}
         >
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
             {loadingMore ? <div className="py-1 text-center text-xs text-[rgb(var(--orb-muted-rgb))]">Загрузка…</div> : null}
