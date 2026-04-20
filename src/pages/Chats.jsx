@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Check,
@@ -598,6 +598,22 @@ export default function Chats() {
       el.removeEventListener('scroll', onScroll);
     };
   }, [activeId]);
+
+  // Two-phase scroll-to-bottom. On chat open the whole list re-renders
+  // and the default browser position is the top — if we wait for a paint
+  // before scrolling, the user sees the chat "jump" from the top to the
+  // latest message. useLayoutEffect runs synchronously after the DOM
+  // mutation, before the browser paints, so the first frame the user
+  // sees is already at the bottom. A second rAF-based scroll catches
+  // any late layout changes (images resolving their intrinsic size,
+  // AnimatePresence timings, etc.) that would otherwise leave a small
+  // residual gap.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!stickToBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
+  }, [activeId, messages.length]);
 
   useEffect(() => {
     const el = scrollRef.current;
