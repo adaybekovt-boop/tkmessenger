@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Blocks, Clock, Gamepad2, Loader2, Spade, Swords, Users, User } from 'lucide-react';
 import { hapticTap } from '../core/haptics.js';
 import { cx } from '../utils/common.js';
@@ -42,21 +42,30 @@ const GAMES = [
   }
 ];
 
-function GameCard({ game, onSelect }) {
+function GameCard({ game, onSelect, index }) {
   const Icon = game.icon;
   const isReady = game.status === 'ready';
   return (
     <motion.button
       type="button"
+      // Explicit entry animation per card — small stagger so the eye reads
+      // them as a sequence instead of three independent flashes. Using
+      // transform + opacity keeps the work on the compositor.
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: isReady ? 1 : 0.6, y: 0 }}
+      transition={{ duration: 0.22, delay: 0.04 + index * 0.05, ease: 'easeOut' }}
       whileTap={isReady ? { scale: 0.97 } : undefined}
       onClick={() => { if (isReady) { hapticTap(); onSelect(game.id); } }}
       disabled={!isReady}
       className={cx(
-        'group relative flex w-full flex-col overflow-hidden rounded-2xl bg-gradient-to-br p-4 text-left ring-1 transition-all duration-200',
+        // Avoid `transition-all` — it animates background-image and ring on
+        // first paint, which the eye reads as flicker. Limit transitions to
+        // the hover ring colour only, leaving entry/tap to Framer Motion.
+        'group relative flex w-full flex-col overflow-hidden rounded-2xl bg-gradient-to-br p-4 text-left ring-1 transition-colors duration-200',
         game.gradient,
         isReady
           ? 'ring-[rgb(var(--orb-border-rgb))] hover:ring-[rgb(var(--orb-accent-rgb))]/60'
-          : 'cursor-not-allowed opacity-60 ring-[rgb(var(--orb-border-rgb))]'
+          : 'cursor-not-allowed ring-[rgb(var(--orb-border-rgb))]'
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -98,8 +107,8 @@ function Lobby({ onSelect }) {
       </header>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {GAMES.map((g) => (
-          <GameCard key={g.id} game={g} onSelect={onSelect} />
+        {GAMES.map((g, i) => (
+          <GameCard key={g.id} game={g} onSelect={onSelect} index={i} />
         ))}
       </div>
 
@@ -117,38 +126,34 @@ export default function Games() {
 
   const backToLobby = () => { hapticTap(); setScreen('lobby'); };
 
+  // No inner AnimatePresence: the parent <PageTransition> in App.jsx already
+  // fades the whole tab in (opacity + blur). Stacking another opacity fade
+  // here forced an extra compositing layer to spin up and tear down on every
+  // lobby↔game switch — the two animations interfered, which is what made
+  // the cards flicker. Card entry is now driven directly by Framer Motion
+  // on each <GameCard> (with a small stagger), giving a smoother feel
+  // without the double-layer cost.
   return (
     <div className="relative h-full w-full">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={screen}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="h-full w-full"
-        >
-          {screen === 'lobby' ? (
-            <Lobby onSelect={(id) => { setScreen(id); }} />
-          ) : screen === 'blockblast' ? (
-            <Suspense fallback={
-              <div className="flex h-full w-full items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--orb-muted-rgb))]" />
-              </div>
-            }>
-              <BlockBlast onExit={backToLobby} />
-            </Suspense>
-          ) : screen === 'blackjack21' ? (
-            <Suspense fallback={
-              <div className="flex h-full w-full items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--orb-muted-rgb))]" />
-              </div>
-            }>
-              <Blackjack21 onExit={backToLobby} />
-            </Suspense>
-          ) : null}
-        </motion.div>
-      </AnimatePresence>
+      {screen === 'lobby' ? (
+        <Lobby onSelect={(id) => { setScreen(id); }} />
+      ) : screen === 'blockblast' ? (
+        <Suspense fallback={
+          <div className="flex h-full w-full items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--orb-muted-rgb))]" />
+          </div>
+        }>
+          <BlockBlast onExit={backToLobby} />
+        </Suspense>
+      ) : screen === 'blackjack21' ? (
+        <Suspense fallback={
+          <div className="flex h-full w-full items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--orb-muted-rgb))]" />
+          </div>
+        }>
+          <Blackjack21 onExit={backToLobby} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
