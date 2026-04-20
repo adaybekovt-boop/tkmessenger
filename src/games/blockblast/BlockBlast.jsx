@@ -244,18 +244,33 @@ export default function BlockBlast({ onExit }) {
   // Convert pointer position to a snap target on the grid. The shape is
   // rendered with its geometric centre following the pointer+offset, so the
   // target cell is derived from the top-left of the shape (center − size/2).
+  // When the shape's reference point lands inside the grid bounds (plus a
+  // small tolerance), we clamp the target to [0, GRID_SIZE - dim] so the
+  // preview always shows the entire shape and the floating piece can snap
+  // flush to the grid edges instead of leaking into the slots tray.
   const computeTarget = useCallback((clientX, clientY, shape, offsetY) => {
     const gridBox = gridRef.current?.getBoundingClientRect();
-    if (!gridBox) return { targetRow: null, targetCol: null };
+    if (!gridBox) return { targetRow: null, targetCol: null, overGrid: false, gridBox: null };
     const size = gridBox.width / GRID_SIZE;
     const { h, w } = shapeBounds(shape);
     const refX = clientX;
     const refY = clientY + offsetY;
     const topLeftX = refX - (w * size) / 2;
     const topLeftY = refY - (h * size) / 2;
-    const targetCol = Math.round((topLeftX - gridBox.left) / size);
-    const targetRow = Math.round((topLeftY - gridBox.top) / size);
-    return { targetRow, targetCol };
+    const rawRow = Math.round((topLeftY - gridBox.top) / size);
+    const rawCol = Math.round((topLeftX - gridBox.left) / size);
+    // Treat the shape as "engaged with the grid" once its reference centre is
+    // inside the board — a bit of slack outside lets the user pull up from
+    // the tray without the piece popping between snapped/free modes.
+    const tol = size;
+    const overGrid =
+      refX >= gridBox.left - tol && refX <= gridBox.right + tol &&
+      refY >= gridBox.top - tol && refY <= gridBox.bottom + tol;
+    const maxRow = GRID_SIZE - h;
+    const maxCol = GRID_SIZE - w;
+    const targetRow = overGrid ? Math.max(0, Math.min(maxRow, rawRow)) : rawRow;
+    const targetCol = overGrid ? Math.max(0, Math.min(maxCol, rawCol)) : rawCol;
+    return { targetRow, targetCol, overGrid, gridBox };
   }, []);
 
   const beginDrag = useCallback((slotIndex) => (e) => {
@@ -266,7 +281,7 @@ export default function BlockBlast({ onExit }) {
     hapticTap();
     sfx.pickUp();
     const offsetY = e.pointerType === 'touch' ? DRAG_OFFSET_TOUCH : DRAG_OFFSET_MOUSE;
-    const { targetRow, targetCol } = computeTarget(e.clientX, e.clientY, slot.shape, offsetY);
+    const { targetRow, targetCol, overGrid } = computeTarget(e.clientX, e.clientY, slot.shape, offsetY);
     setDrag({
       slotIndex,
       pointerId: e.pointerId,
@@ -277,6 +292,7 @@ export default function BlockBlast({ onExit }) {
       offsetY,
       targetRow,
       targetCol,
+      overGrid,
       valid: false,
     });
   }, [snap, computeTarget]);
@@ -284,14 +300,11 @@ export default function BlockBlast({ onExit }) {
   const updateDrag = useCallback((e) => {
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
-    const { targetRow, targetCol } = computeTarget(e.clientX, e.clientY, d.shape, d.offsetY);
-    const { h, w } = shapeBounds(d.shape);
-    const inside =
-      targetRow != null && targetCol != null &&
-      targetRow >= 0 && targetCol >= 0 &&
-      targetRow + h <= GRID_SIZE && targetCol + w <= GRID_SIZE;
-    const valid = inside && engineRef.current.canPlace(d.slotIndex, targetRow, targetCol);
-    setDrag({ ...d, pointerX: e.clientX, pointerY: e.clientY, targetRow, targetCol, valid });
+    const { targetRow, targetCol, overGrid } = computeTarget(e.clientX, e.clientY, d.shape, d.offsetY);
+    // Because computeTarget clamps when overGrid, the shape always fits —
+    // validity depends purely on whether the engine lets us place there.
+    const valid = overGrid && engineRef.current.canPlace(d.slotIndex, targetRow, targetCol);
+    setDrag({ ...d, pointerX: e.clientX, pointerY: e.clientY, targetRow, targetCol, overGrid, valid });
   }, [computeTarget, setDrag]);
 
   const endDrag = useCallback((e) => {
@@ -313,16 +326,14 @@ export default function BlockBlast({ onExit }) {
   }, [commit, setDrag]);
 
   // Which cells would be filled by the drag's current snap target — used by
-  // GhostCell overlay to show a preview on the board.
+  // GhostCell overlay to show a preview on the board. Only rendered while the
+  // shape is engaged with the grid; target is already clamped in that case so
+  // every cell is guaranteed in-bounds.
   const ghostCells = useMemo(() => {
-    if (!drag || drag.targetRow == null || drag.targetCol == null) return null;
+    if (!drag || !drag.overGrid || drag.targetRow == null || drag.targetCol == null) return null;
     const cells = [];
     for (const [dr, dc] of drag.shape) {
-      const r = drag.targetRow + dr;
-      const c = drag.targetCol + dc;
-      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
-        cells.push({ r, c });
-      }
+      cells.push({ r: drag.targetRow + dr, c: drag.targetCol + dc });
     }
     return cells;
   }, [drag]);
@@ -379,7 +390,10 @@ export default function BlockBlast({ onExit }) {
           style={{
             gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))`,
             gridTemplateRows: `repeat(${GRID_SIZE}, minmax(0, 1fr))`,
-            width: 'min(100%, 100vh - 360px)',
+            // Use the visible viewport height (synced by useVisualViewport)
+            // rather than raw `100vh` so the grid sizes correctly on iOS
+            // Safari when the URL bar / keyboard resize the viewport.
+            width: 'min(100%, calc(var(--orb-vvh, 1vh) * 100 - 360px))',
             maxHeight: '100%',
             // Use the text token with low opacity so gridlines stay visible on
             // both cream and near-black backgrounds — a hardcoded white would
@@ -499,7 +513,7 @@ export default function BlockBlast({ onExit }) {
 
       {/* Floating drag preview */}
       {drag ? (
-        <FloatingPiece drag={drag} cellSize={cellSize} />
+        <FloatingPiece drag={drag} cellSize={cellSize} gridRef={gridRef} />
       ) : null}
     </div>
   );
@@ -581,20 +595,59 @@ function SlotTray({ slots, dragSlotIdx, disabled, shakeKey, onBegin, onMove, onE
   );
 }
 
-function FloatingPiece({ drag, cellSize }) {
+function FloatingPiece({ drag, cellSize, gridRef }) {
   const { h, w } = shapeBounds(drag.shape);
-  // Position top-left so the shape's centre sits at (pointerX, pointerY + offsetY).
-  const left = drag.pointerX - (w * cellSize) / 2;
-  const top = drag.pointerY + drag.offsetY - (h * cellSize) / 2;
+  // When the shape is engaged with the grid, lock its top-left to the snapped
+  // target cell so the floating piece and the ghost preview are always the
+  // same shape in the same place — no more "finger in slots, preview up on
+  // the board" feeling. Free-follow only while picking the piece up from
+  // the tray (pointer not yet over the grid).
+  let left, top;
+  if (drag.overGrid && gridRef?.current && drag.targetRow != null && drag.targetCol != null) {
+    const gridBox = gridRef.current.getBoundingClientRect();
+    left = gridBox.left + drag.targetCol * cellSize;
+    top = gridBox.top + drag.targetRow * cellSize;
+  } else {
+    left = drag.pointerX - (w * cellSize) / 2;
+    top = drag.pointerY + drag.offsetY - (h * cellSize) / 2;
+  }
+  const rgb = COLORS[drag.color];
+  // Render cells matching the grid's FilledCell (cellSize-wide square with a
+  // 2px internal padding for the inset look). This keeps the floating piece
+  // pixel-aligned with both the ghost preview and the placed blocks.
+  const cells = [];
+  for (const [dr, dc] of drag.shape) cells.push({ dr, dc });
   return (
     <div
       className="pointer-events-none fixed left-0 top-0 z-50"
       style={{
         transform: `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`,
-        filter: `drop-shadow(0 8px 18px rgb(${COLORS[drag.color]} / 0.4))`,
+        filter: `drop-shadow(0 8px 18px rgb(${rgb} / 0.4))`,
       }}
     >
-      <ShapePreview shape={drag.shape} color={drag.color} cellSize={Math.max(cellSize - 2, 8)} gap={2} />
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${w}, ${cellSize}px)`,
+          gridTemplateRows: `repeat(${h}, ${cellSize}px)`,
+        }}
+      >
+        {cells.map(({ dr, dc }, i) => (
+          <div
+            key={i}
+            className="p-[2px]"
+            style={{ gridRow: dr + 1, gridColumn: dc + 1 }}
+          >
+            <div
+              className="h-full w-full rounded-[4px]"
+              style={{
+                background: `linear-gradient(145deg, rgb(${rgb} / 1) 0%, rgb(${rgb} / 0.7) 100%)`,
+                boxShadow: `inset 0 0 0 1px rgb(${rgb} / 0.9), inset 0 1px 0 rgba(255,255,255,0.28)`,
+              }}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
