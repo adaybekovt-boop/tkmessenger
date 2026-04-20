@@ -15,14 +15,27 @@ export default function VoicePlayer({ msgId, voice, mine }) {
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
 
+  const mountedRef = useRef(true);
+
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (urlRef.current) {
         try { URL.revokeObjectURL(urlRef.current); } catch (_) {}
+        urlRef.current = '';
       }
       const a = audioRef.current;
       if (a) {
         try { a.pause(); } catch (_) {}
+        // Drop handler closures so the audio element and its state-setters
+        // can be collected — onended/ontimeupdate held the setPlaying /
+        // setProgress closures that would otherwise keep referencing the
+        // unmounted component.
+        a.onended = null;
+        a.ontimeupdate = null;
+        try { a.removeAttribute('src'); a.load(); } catch (_) {}
+        audioRef.current = null;
       }
     };
   }, []);
@@ -32,17 +45,27 @@ export default function VoicePlayer({ msgId, voice, mine }) {
     setLoading(true);
     try {
       const row = await getVoiceBlob(msgId);
+      // If the component unmounted while we were awaiting IndexedDB, drop
+      // the blob — creating the object URL now would leak it because the
+      // unmount cleanup has already run with urlRef empty.
+      if (!mountedRef.current) return false;
       if (!row?.blob) return false;
       const url = URL.createObjectURL(row.blob);
+      if (!mountedRef.current) {
+        try { URL.revokeObjectURL(url); } catch (_) {}
+        return false;
+      }
       urlRef.current = url;
       if (!audioRef.current) audioRef.current = new Audio();
       const a = audioRef.current;
       a.src = url;
       a.onended = () => {
+        if (!mountedRef.current) return;
         setPlaying(false);
         setProgress(0);
       };
       a.ontimeupdate = () => {
+        if (!mountedRef.current) return;
         const d = a.duration || voice?.duration || 0;
         setProgress(d > 0 ? Math.min(1, a.currentTime / d) : 0);
       };
@@ -51,7 +74,7 @@ export default function VoicePlayer({ msgId, voice, mine }) {
     } catch (_) {
       return false;
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [msgId, ready, voice?.duration]);
 

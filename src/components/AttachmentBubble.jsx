@@ -18,6 +18,7 @@ import { cx } from '../utils/common.js';
 
 export default function AttachmentBubble({ msgId, attachment, mine }) {
   const urlRef = useRef('');
+  const mountedRef = useRef(true);
   const [fullUrl, setFullUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [unavailable, setUnavailable] = useState(!!attachment?.missing);
@@ -25,9 +26,12 @@ export default function AttachmentBubble({ msgId, attachment, mine }) {
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (urlRef.current) {
         try { URL.revokeObjectURL(urlRef.current); } catch (_) {}
+        urlRef.current = '';
       }
     };
   }, []);
@@ -38,19 +42,27 @@ export default function AttachmentBubble({ msgId, attachment, mine }) {
     setLoading(true);
     try {
       const row = await getFileBlob(msgId);
+      // Short-circuit if the bubble unmounted while IndexedDB was
+      // resolving — creating the object URL now would leak it: the
+      // unmount cleanup already ran against an empty urlRef.
+      if (!mountedRef.current) return '';
       if (!row?.blob) {
         setUnavailable(true);
         return '';
       }
       const url = URL.createObjectURL(row.blob);
+      if (!mountedRef.current) {
+        try { URL.revokeObjectURL(url); } catch (_) {}
+        return '';
+      }
       urlRef.current = url;
       setFullUrl(url);
       return url;
     } catch (_) {
-      setUnavailable(true);
+      if (mountedRef.current) setUnavailable(true);
       return '';
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [fullUrl, msgId, unavailable]);
 
