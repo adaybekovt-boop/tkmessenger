@@ -1,14 +1,27 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Blocks, Clock, Gamepad2, Loader2, Spade, Swords, Users, User } from 'lucide-react';
 import { hapticTap } from '../core/haptics.js';
 import { cx } from '../utils/common.js';
 
-// Each game is its own lazy chunk — idle users don't pay for the Block Blast
-// runtime until they open it, and future Blackjack / Chess bundles won't
-// bloat the lobby either.
-const BlockBlast = lazy(() => import('../games/blockblast/BlockBlast.jsx'));
-const Blackjack21 = lazy(() => import('../games/blackjack21/Blackjack21.jsx'));
+// Keep direct refs to the dynamic imports so we can warm them up before the
+// user taps a card. Once a chunk's promise resolves, React's <Suspense> will
+// render the child synchronously (no fallback flash) on first render.
+const loadBlockBlast = () => import('../games/blockblast/BlockBlast.jsx');
+const loadBlackjack21 = () => import('../games/blackjack21/Blackjack21.jsx');
+const BlockBlast = lazy(loadBlockBlast);
+const Blackjack21 = lazy(loadBlackjack21);
+
+// Map ids to their preload function. Unknown ids are a no-op.
+const PRELOADERS = {
+  blockblast: loadBlockBlast,
+  blackjack21: loadBlackjack21,
+};
+
+function preloadGame(id) {
+  const fn = PRELOADERS[id];
+  if (fn) { try { void fn(); } catch (_) {} }
+}
 
 const GAMES = [
   {
@@ -55,6 +68,12 @@ function GameCard({ game, onSelect, index }) {
       animate={{ opacity: isReady ? 1 : 0.6, y: 0 }}
       transition={{ duration: 0.22, delay: 0.04 + index * 0.05, ease: 'easeOut' }}
       whileTap={isReady ? { scale: 0.97 } : undefined}
+      // Start fetching the game's JS chunk the moment the finger lands on
+      // the card — by the time the tap completes (~100-200ms), the lazy
+      // module is usually already resolved and <Suspense> skips its
+      // fallback on the next render. No more spinner flash between Lobby
+      // and the game.
+      onPointerDown={isReady ? () => preloadGame(game.id) : undefined}
       onClick={() => { if (isReady) { hapticTap(); onSelect(game.id); } }}
       disabled={!isReady}
       className={cx(
@@ -92,6 +111,24 @@ function GameCard({ game, onSelect, index }) {
 }
 
 function Lobby({ onSelect }) {
+  // Warm both game chunks during the browser's idle time, so even a user
+  // who double-taps or has a flaky connection still gets an instant open.
+  // Pointerdown on the card is the primary preload path; this is a net.
+  useEffect(() => {
+    const idle = (cb) =>
+      (typeof window !== 'undefined' && window.requestIdleCallback)
+        ? window.requestIdleCallback(cb, { timeout: 1500 })
+        : setTimeout(cb, 400);
+    const cancel = (id) =>
+      (typeof window !== 'undefined' && window.cancelIdleCallback)
+        ? window.cancelIdleCallback(id)
+        : clearTimeout(id);
+    const handle = idle(() => {
+      for (const id of Object.keys(PRELOADERS)) preloadGame(id);
+    });
+    return () => cancel(handle);
+  }, []);
+
   return (
     <div className="h-full w-full overflow-y-auto px-4 pb-6 pt-3">
       <header className="mb-4 flex items-center gap-3">

@@ -467,8 +467,11 @@ export default function BlockBlast({ onExit }) {
             ) : null}
           </AnimatePresence>
 
-          {/* Idle / game-over overlays */}
-          <AnimatePresence>
+          {/* Idle / game-over overlays. initial={false} so the idle panel
+              doesn't fade in over an empty grid on first mount — that was
+              reading as a screen flash when the user first entered the
+              game. The transition is still animated on status changes. */}
+          <AnimatePresence initial={false}>
             {isIdle ? (
               <motion.div
                 key="idle"

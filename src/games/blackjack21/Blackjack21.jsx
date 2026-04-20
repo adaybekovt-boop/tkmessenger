@@ -269,7 +269,10 @@ function Lobby({ onSolo, onPvp, onExit, peer }) {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-6">
-        <AnimatePresence mode="wait">
+        {/* initial={false}: don't fade the mode picker in on first mount —
+            it was flashing when the user entered the game from the lobby.
+            Transitions between modes still animate normally. */}
+        <AnimatePresence mode="wait" initial={false}>
           {!pick ? (
             <motion.div
               key="root"
