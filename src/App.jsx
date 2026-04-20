@@ -6,10 +6,18 @@ import OrbitsLogo from './components/OrbitsLogo.jsx';
 import Onboarding from './components/Onboarding.jsx';
 
 // Lazy-loaded pages — each gets its own chunk, loaded on first navigation.
-const Chats = lazy(() => import('./pages/Chats.jsx'));
-const DropView = lazy(() => import('./pages/Drop.jsx'));
-const GamesView = lazy(() => import('./pages/Games.jsx'));
-const Settings = lazy(() => import('./pages/Settings.jsx'));
+// Importer fns are exported alongside the components so we can warm the
+// chunk cache on boot (see the idle-preload effect in App). Without this
+// the first tap on a tab shows the Suspense spinner for a frame, which
+// reads as a flash between screens.
+const loadChats = () => import('./pages/Chats.jsx');
+const loadDrop = () => import('./pages/Drop.jsx');
+const loadGames = () => import('./pages/Games.jsx');
+const loadSettings = () => import('./pages/Settings.jsx');
+const Chats = lazy(loadChats);
+const DropView = lazy(loadDrop);
+const GamesView = lazy(loadGames);
+const Settings = lazy(loadSettings);
 import { PeerProvider } from './context/PeerContext.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { useVisualViewport } from './hooks/useVisualViewport.js';
@@ -239,6 +247,27 @@ export default function App() {
     // Request persistent storage to avoid data eviction
     void requestPersistentStorage();
     return cancel;
+  }, []);
+
+  // Warm every tab's chunk during idle time so tab switches don't show
+  // the Suspense spinner mid-navigation. Chats is the default tab and
+  // already loads at boot; the others (Drop, Games, Settings) get
+  // fetched right after the first idle frame.
+  useEffect(() => {
+    const idle = (cb) =>
+      (typeof window !== 'undefined' && window.requestIdleCallback)
+        ? window.requestIdleCallback(cb, { timeout: 2500 })
+        : setTimeout(cb, 600);
+    const cancel = (id) =>
+      (typeof window !== 'undefined' && window.cancelIdleCallback)
+        ? window.cancelIdleCallback(id)
+        : clearTimeout(id);
+    const handle = idle(() => {
+      try { void loadDrop(); } catch (_) {}
+      try { void loadGames(); } catch (_) {}
+      try { void loadSettings(); } catch (_) {}
+    });
+    return () => cancel(handle);
   }, []);
 
   const handleInstall = useCallback(async () => {
