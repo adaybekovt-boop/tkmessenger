@@ -36,7 +36,7 @@ import StickerPicker from '../components/StickerPicker.jsx';
 import VoiceRecorder, { VoiceButton } from '../components/VoiceRecorder.jsx';
 import VoicePlayer from '../components/VoicePlayer.jsx';
 import AttachmentBubble from '../components/AttachmentBubble.jsx';
-import { cx, formatTimestamp as formatTime, formatLastSeen, safeJsonParse } from '../utils/common.js';
+import { cx, formatTimestamp as formatTime, formatLastSeen, peerDisplayName, safeJsonParse } from '../utils/common.js';
 
 function Avatar({ profile, fallback, online }) {
   const img = profile?.avatarDataUrl;
@@ -77,7 +77,12 @@ function StatusDot({ status }) {
 function PeerRow({ peer, active, meta, onClick }) {
   const peerCtx = usePeerContext();
   const prof = peerCtx.profilesByPeer?.[peer.id] || null;
-  const display = prof?.displayName || peer.displayName || peer.id;
+  // Never show the raw ORBITS-XXXXXX id in the contact list — the row
+  // should read the contact's profile nickname (or the local label the
+  // user gave them when adding). `peerDisplayName` falls back to a short
+  // "Контакт •A5C3" style placeholder while the remote profile is still
+  // being fetched, so the list is readable from the first paint.
+  const display = peerDisplayName({ profile: prof, peer });
   const lastText = meta?.lastText || '';
   const lastTs = meta?.lastTs || 0;
   const unread = Number(meta?.unread || 0) || 0;
@@ -188,7 +193,7 @@ function ReplyPreviewInline({ replyTo, mine }) {
           : 'bg-[rgb(var(--orb-bg-rgb))]/30 ring-[rgb(var(--orb-border-rgb))]'
       )}
     >
-      <div className="font-semibold text-[rgb(var(--orb-accent-rgb))]">{replyTo.fromName || replyTo.from || 'Сообщение'}</div>
+      <div className="font-semibold text-[rgb(var(--orb-accent-rgb))]">{replyTo.fromName || (replyTo.from ? peerDisplayName({ id: replyTo.from }) : 'Сообщение')}</div>
       <div className="mt-0.5 truncate text-[rgb(var(--orb-muted-rgb))]">{preview || '…'}</div>
     </div>
   );
@@ -445,7 +450,10 @@ export default function Chats() {
   const activeId = peer.selectedPeerId || '';
   const messages = peer.messagesByPeer[activeId] || [];
   const activeProfile = activeId ? peer.profilesByPeer?.[activeId] : null;
-  const headerName = activeProfile?.displayName || activeId || 'Чаты';
+  const activePeerEntry = activeId ? peer.peers.find((p) => p.id === activeId) : null;
+  const headerName = activeId
+    ? peerDisplayName({ profile: activeProfile, peer: activePeerEntry, id: activeId })
+    : 'Чаты';
   const [activePin, setActivePin] = useState(null);
   const [pinInfoOpen, setPinInfoOpen] = useState(false);
 
@@ -699,8 +707,12 @@ export default function Chats() {
   const buildReplyPayload = useCallback((msg) => {
     if (!msg) return null;
     const fromName = msg.from === peer.peerId
-      ? (peer.peers.find((p) => p.id === activeId)?.id && 'Вы') || 'Вы'
-      : (peer.profilesByPeer?.[msg.from]?.displayName || msg.from);
+      ? 'Вы'
+      : peerDisplayName({
+          profile: peer.profilesByPeer?.[msg.from],
+          peer: peer.peers.find((p) => p.id === msg.from),
+          id: msg.from,
+        });
     return {
       id: msg.id,
       from: msg.from,
@@ -1027,7 +1039,12 @@ export default function Chats() {
       </aside>
 
       <section
-        className="orb-page-bg flex min-w-0 flex-1 flex-col bg-[rgb(var(--orb-bg-rgb))]"
+        className="orb-page-bg flex min-w-0 flex-1 flex-col overflow-x-hidden bg-[rgb(var(--orb-bg-rgb))]"
+        // touch-action: pan-y tells the browser the section only scrolls
+        // vertically — iOS/Android stop interpreting horizontal finger
+        // drags as swipe-back / pull-to-go-back gestures, which is what
+        // was making the chat slide side-to-side ("в право и в лево").
+        style={{ touchAction: 'pan-y', overscrollBehaviorX: 'contain' }}
         onTouchStart={handleSwipeTouchStart}
         onTouchEnd={handleSwipeTouchEnd}
       >
@@ -1208,7 +1225,13 @@ export default function Chats() {
               <div className="h-8 w-1 shrink-0 rounded-full bg-[rgb(var(--orb-accent-rgb))]" />
               <div className="min-w-0 flex-1">
                 <div className="text-[11px] font-semibold text-[rgb(var(--orb-accent-rgb))]">
-                  Ответ {replyTo.from === peer.peerId ? 'на своё сообщение' : (replyTo.fromName || peer.profilesByPeer?.[replyTo.from]?.displayName || replyTo.from)}
+                  Ответ {replyTo.from === peer.peerId
+                    ? 'на своё сообщение'
+                    : (replyTo.fromName || peerDisplayName({
+                        profile: peer.profilesByPeer?.[replyTo.from],
+                        peer: peer.peers.find((p) => p.id === replyTo.from),
+                        id: replyTo.from,
+                      }))}
                 </div>
                 <div className="truncate text-xs text-[rgb(var(--orb-muted-rgb))]">
                   {replyTo.type === 'sticker'

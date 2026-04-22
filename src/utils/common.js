@@ -75,6 +75,36 @@ export function formatLastSeen(ts, now = Date.now()) {
   }
 }
 
+/**
+ * Peer display-name resolution. In the chat list we never want to show a
+ * raw `ORBITS-XXXXXX` id — the user should see the contact's profile
+ * nickname (or the one they set locally when adding the contact). Only
+ * when nothing at all is known, we fall back to a short, friendly label
+ * derived from the id tail (e.g. "Контакт •A5C3") so the row still has a
+ * readable name while the remote profile is still being fetched.
+ *
+ * Arguments are intentionally loose — callers can pass any subset they
+ * have access to and the function picks the best one.
+ */
+export function peerDisplayName({ profile, peer, id } = {}) {
+  const fromProfile = (profile?.displayName || '').trim();
+  if (fromProfile) return fromProfile;
+  const fromPeer = (peer?.displayName || '').trim();
+  if (fromPeer) return fromPeer;
+  return shortPeerLabel(peer?.id || id || '');
+}
+
+/** Produce a friendly short label from a peer id (never raw ORBITS-XXXXXX). */
+export function shortPeerLabel(rawId) {
+  const s = String(rawId || '').trim();
+  if (!s) return 'Контакт';
+  // Keep the last 4 characters — that's what the user actually
+  // recognises when cross-checking fingerprints. Drop the
+  // ORBITS- prefix entirely.
+  const tail = s.replace(/^orbits[-_:]?/i, '').slice(-4).toUpperCase();
+  return tail ? `Контакт •${tail}` : 'Контакт';
+}
+
 /** Format seconds to mm:ss.t (for voice recorder / call duration). */
 export function formatDuration(seconds) {
   const s = Math.max(0, Math.floor(seconds));
