@@ -90,6 +90,13 @@ function IntroOverlay({ open }) {
 
 function CallOverlayMount() {
   const peer = usePeerContext();
+  // Keep CallOverlay out of the tree entirely while idle. The component
+  // previously always rendered (returning null), but its useEffects for
+  // video refs, fullscreen, haptics etc. still ran on every call-state
+  // update. Unmounting while idle means zero work until a call actually
+  // starts.
+  const status = peer?.call?.state?.status;
+  if (!status || status === 'idle') return null;
   return <CallOverlay call={peer.call} />;
 }
 

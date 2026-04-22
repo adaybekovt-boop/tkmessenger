@@ -250,6 +250,19 @@ const MessageBubble = memo(function MessageBubble({ msg, mine, showSeconds, onCo
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className={cx('flex', mine ? 'justify-end' : 'justify-start')}
       data-orb-bubble-row={mine ? 'own' : 'peer'}
+      // content-visibility: auto → browser skips layout + paint for
+      // bubbles scrolled off-screen. Critical for long histories — a
+      // 1000-message chat now does the same per-frame work as a 20-
+      // message one. contain-intrinsic-size is a placeholder so scroll-
+      // height math stays accurate while the bubble is unrendered.
+      // contain:content isolates any reflow inside the bubble to the
+      // bubble itself, so message-list updates don't force a pass over
+      // siblings.
+      style={{
+        contentVisibility: 'auto',
+        containIntrinsicSize: '0 80px',
+        contain: 'content',
+      }}
     >
       {isSticker ? (
         <div
