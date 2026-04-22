@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
 import { Activity, Bell, ChevronLeft, ClipboardCopy, Cpu, Flower2, Layers, Lock, LogOut, MessageSquare, Mic2, Moon, Palette, PlugZap, RefreshCw, Shield, SlidersHorizontal, Sparkles, Trash2, UserRound, Zap } from 'lucide-react';
 import { useOrbitsWorker } from '../hooks/useOrbitsWorker.js';
 import { usePeerContext } from '../context/PeerContext.jsx';
@@ -147,39 +147,85 @@ function ActionCard({ icon: Icon, title, subtitle, onClick, tone }) {
   );
 }
 
-// Big "you" card at the top of the Settings home, Telegram-style. The
-// avatar/name/@username is always the primary anchor; tapping it opens
-// the profile editor. Keeps the page from looking like a featureless
-// list on mobile.
-function ProfileCard({ user, onClick }) {
+// Telegram-style stretchy profile header. At rest shows the user's
+// photo as a full-width banner with their name overlaid at the bottom.
+// As the Settings list scrolls up, the banner collapses into a small
+// circular avatar + name row at the top — all driven by scroll position
+// via Framer Motion transforms so the work stays on the compositor
+// (no per-frame React re-renders).
+//
+// Props:
+//   user       — { displayName, username, avatarDataUrl }
+//   scrollRef  — ref to the scrollable container below
+//   onClick    — tap opens the profile editor
+function ProfileStretchyHeader({ user, scrollRef, onClick }) {
   const display = user?.displayName || user?.username || 'Orbits';
   const username = user?.username ? `@${user.username}` : '';
   const letter = String(display).trim().charAt(0).toUpperCase() || 'O';
+
+  // Scroll range over which the morph happens. 0 = fully expanded
+  // banner; MORPH = fully collapsed compact row.
+  const MORPH = 220;
+
+  const { scrollY } = useScroll({ container: scrollRef });
+  // Photo goes from full 260px banner → 52px avatar.
+  const photoSize = useTransform(scrollY, [0, MORPH], [260, 52]);
+  // Rectangle (12px corners) → perfect circle (50%).
+  const photoRadius = useTransform(scrollY, [0, MORPH], ['18px', '50%']);
+  // Banner tint fades out as it collapses so the underlying list bg
+  // takes over.
+  const bannerOpacity = useTransform(scrollY, [0, MORPH * 0.8], [1, 0]);
+  // Name slides from big-bottom-of-banner to compact-right-of-avatar.
+  const nameScale = useTransform(scrollY, [0, MORPH], [1, 0.72]);
+  const nameY = useTransform(scrollY, [0, MORPH], [0, -14]);
+
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-3xl bg-gradient-to-br from-[rgb(var(--orb-accent-rgb))]/18 to-[rgb(var(--orb-accent2-rgb))]/8 p-4 text-left ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-200 active:scale-[0.99]"
+      className="relative flex w-full flex-col items-center justify-end overflow-hidden text-center"
+      style={{ height: useTransform(scrollY, [0, MORPH], [280, 96]) }}
     >
-      {user?.avatarDataUrl ? (
-        <img
-          alt=""
-          src={user.avatarDataUrl}
-          className="h-16 w-16 rounded-full object-cover ring-2 ring-white/10"
-        />
-      ) : (
-        <div className="grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[rgb(var(--orb-accent-rgb))]/30 to-[rgb(var(--orb-accent2-rgb))]/30 text-xl font-semibold text-[rgb(var(--orb-text-rgb))] ring-2 ring-white/10">
-          {letter}
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
+      {/* Full-bleed banner tint. Fades as the header collapses so it
+          doesn't leave a gradient stripe across the list. */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[rgb(var(--orb-accent-rgb))]/15 via-[rgb(var(--orb-accent2-rgb))]/5 to-transparent"
+        style={{ opacity: bannerOpacity }}
+      />
+
+      <motion.div
+        className="relative mt-3 overflow-hidden ring-2 ring-white/10"
+        style={{
+          width: photoSize,
+          height: photoSize,
+          borderRadius: photoRadius,
+        }}
+      >
+        {user?.avatarDataUrl ? (
+          <img
+            alt=""
+            src={user.avatarDataUrl}
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[rgb(var(--orb-accent-rgb))]/40 to-[rgb(var(--orb-accent2-rgb))]/40 text-4xl font-semibold text-[rgb(var(--orb-text-rgb))]">
+            {letter}
+          </div>
+        )}
+      </motion.div>
+
+      <motion.div
+        className="mt-2 mb-3 px-3"
+        style={{ scale: nameScale, y: nameY, transformOrigin: 'center top' }}
+      >
         <div className="truncate text-lg font-semibold text-[rgb(var(--orb-text-rgb))]">{display}</div>
         {username ? (
           <div className="mt-0.5 truncate text-xs text-[rgb(var(--orb-muted-rgb))]">{username}</div>
         ) : null}
-      </div>
-      <ChevronLeft className="h-4 w-4 shrink-0 rotate-180 text-[rgb(var(--orb-muted-rgb))]" />
-    </button>
+      </motion.div>
+    </motion.button>
   );
 }
 
@@ -501,14 +547,29 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
                 : 'PWA и Web Worker';
 
   const back = screen === 'home' ? null : () => setScreen('home');
+  const scrollRef = useRef(null);
 
   return (
     <div className="orb-page-bg flex h-full w-full flex-col overflow-hidden bg-[rgb(var(--orb-bg-rgb))]">
-      <NavHeader title={title} subtitle={subtitle} onBack={back} />
+      {/* Hide the usual NavHeader on the home screen — the stretchy
+          profile header doubles as the hero area, a separate title
+          strip above it would just crowd the top. */}
+      {screen === 'home' ? null : <NavHeader title={title} subtitle={subtitle} onBack={back} />}
 
-      <div className="orb-scroll flex-1 overflow-y-auto px-4 py-4">
+      <div
+        ref={scrollRef}
+        className="orb-scroll flex-1 overflow-y-auto"
+        style={{ overscrollBehavior: 'contain' }}
+      >
         <div className="mx-auto w-full max-w-4xl">
-          <div className="relative">
+          {screen === 'home' ? (
+            <ProfileStretchyHeader
+              user={auth.user}
+              scrollRef={scrollRef}
+              onClick={() => setScreen('profile')}
+            />
+          ) : null}
+          <div className={cx('relative', screen === 'home' ? 'px-4 pb-4' : 'px-4 py-4')}>
             <motion.div
               key={screen}
               initial={{ opacity: 0, y: 8 }}
@@ -517,19 +578,16 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
               className="grid gap-4"
             >
               {screen === 'home' ? (
-                <>
-                  <ProfileCard user={auth.user} onClick={() => setScreen('profile')} />
-                  <div className="grid gap-2">
-                    <ActionCard icon={Lock} title="Безопасность" subtitle="Wipe-on-Close, Duress-пароль, шифрование" onClick={() => setScreen('security')} />
-                    <ActionCard icon={MessageSquare} title="Чаты" subtitle="Настройка чатов, синхронизация, очистка" onClick={() => setScreen('chats')} />
-                    <ActionCard icon={Bell} title="Уведомления" subtitle={notifPermission === 'granted' ? 'Разрешены' : 'Настройка разрешений'} onClick={() => setScreen('notifications')} />
-                    <ActionCard icon={Palette} title="Внешний вид" subtitle="Темы и цвет акцента" onClick={() => setScreen('appearance')} />
-                    <ActionCard icon={Mic2} title="Микрофон" subtitle="Устройство, эффекты и тест" onClick={() => setScreen('mic')} />
-                    <ActionCard icon={Zap} title="Энергосбережение" subtitle="Уменьшить blur и анимации" onClick={() => setScreen('power')} />
-                    <ActionCard icon={PlugZap} title="Сеть" subtitle={`ID и сигналинг (${online ? 'онлайн' : 'оффлайн'})`} onClick={() => setScreen('network')} />
-                    <ActionCard icon={Cpu} title="Диагностика" subtitle="PWA и Web Worker" onClick={() => setScreen('diagnostics')} />
-                  </div>
-                </>
+                <div className="grid gap-2">
+                  <ActionCard icon={Lock} title="Безопасность" subtitle="Wipe-on-Close, Duress-пароль, шифрование" onClick={() => setScreen('security')} />
+                  <ActionCard icon={MessageSquare} title="Чаты" subtitle="Настройка чатов, синхронизация, очистка" onClick={() => setScreen('chats')} />
+                  <ActionCard icon={Bell} title="Уведомления" subtitle={notifPermission === 'granted' ? 'Разрешены' : 'Настройка разрешений'} onClick={() => setScreen('notifications')} />
+                  <ActionCard icon={Palette} title="Внешний вид" subtitle="Темы и цвет акцента" onClick={() => setScreen('appearance')} />
+                  <ActionCard icon={Mic2} title="Микрофон" subtitle="Устройство, эффекты и тест" onClick={() => setScreen('mic')} />
+                  <ActionCard icon={Zap} title="Энергосбережение" subtitle="Уменьшить blur и анимации" onClick={() => setScreen('power')} />
+                  <ActionCard icon={PlugZap} title="Сеть" subtitle={`ID и сигналинг (${online ? 'онлайн' : 'оффлайн'})`} onClick={() => setScreen('network')} />
+                  <ActionCard icon={Cpu} title="Диагностика" subtitle="PWA и Web Worker" onClick={() => setScreen('diagnostics')} />
+                </div>
               ) : null}
 
               {screen === 'profile' ? (
