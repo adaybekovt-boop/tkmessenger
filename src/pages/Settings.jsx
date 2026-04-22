@@ -126,18 +126,59 @@ function ActionCard({ icon: Icon, title, subtitle, onClick, tone }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between rounded-3xl bg-[rgb(var(--orb-surface-rgb))]/30 px-4 py-4 ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-300 ease-in-out active:scale-95"
+      // Compact Telegram-style row — smaller icon tile, tighter padding,
+      // single line when possible. Looks cleaner than the old chunky
+      // 11×11 tiles on a phone screen.
+      className="flex w-full items-center justify-between rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/30 px-3 py-2.5 ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-200 active:scale-[0.98]"
     >
-      <div className="flex items-start gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/55 ring-1 ring-[rgb(var(--orb-border-rgb))]">
-          <Icon className={cx('h-4 w-4', toneCls)} />
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[rgb(var(--orb-bg-rgb))]/55 ring-1 ring-[rgb(var(--orb-border-rgb))]">
+          <Icon className={cx('h-3.5 w-3.5', toneCls)} />
         </div>
-        <div className="text-left">
-          <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">{title}</div>
-          <div className="mt-0.5 text-xs text-[rgb(var(--orb-muted-rgb))]">{subtitle}</div>
+        <div className="min-w-0 text-left">
+          <div className="truncate text-sm font-medium text-[rgb(var(--orb-text-rgb))]">{title}</div>
+          {subtitle ? (
+            <div className="mt-0.5 truncate text-[11px] text-[rgb(var(--orb-muted-rgb))]">{subtitle}</div>
+          ) : null}
         </div>
       </div>
-      <ChevronLeft className="h-4 w-4 rotate-180 text-[rgb(var(--orb-muted-rgb))]" />
+      <ChevronLeft className="h-4 w-4 shrink-0 rotate-180 text-[rgb(var(--orb-muted-rgb))]" />
+    </button>
+  );
+}
+
+// Big "you" card at the top of the Settings home, Telegram-style. The
+// avatar/name/@username is always the primary anchor; tapping it opens
+// the profile editor. Keeps the page from looking like a featureless
+// list on mobile.
+function ProfileCard({ user, onClick }) {
+  const display = user?.displayName || user?.username || 'Orbits';
+  const username = user?.username ? `@${user.username}` : '';
+  const letter = String(display).trim().charAt(0).toUpperCase() || 'O';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-3xl bg-gradient-to-br from-[rgb(var(--orb-accent-rgb))]/18 to-[rgb(var(--orb-accent2-rgb))]/8 p-4 text-left ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-200 active:scale-[0.99]"
+    >
+      {user?.avatarDataUrl ? (
+        <img
+          alt=""
+          src={user.avatarDataUrl}
+          className="h-16 w-16 rounded-full object-cover ring-2 ring-white/10"
+        />
+      ) : (
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[rgb(var(--orb-accent-rgb))]/30 to-[rgb(var(--orb-accent2-rgb))]/30 text-xl font-semibold text-[rgb(var(--orb-text-rgb))] ring-2 ring-white/10">
+          {letter}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-lg font-semibold text-[rgb(var(--orb-text-rgb))]">{display}</div>
+        {username ? (
+          <div className="mt-0.5 truncate text-xs text-[rgb(var(--orb-muted-rgb))]">{username}</div>
+        ) : null}
+      </div>
+      <ChevronLeft className="h-4 w-4 shrink-0 rotate-180 text-[rgb(var(--orb-muted-rgb))]" />
     </button>
   );
 }
@@ -421,7 +462,9 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
     screen === 'home'
       ? 'Настройки'
       : screen === 'profile'
-        ? 'Профиль и сеть'
+        ? 'Профиль'
+        : screen === 'network'
+          ? 'Сеть'
         : screen === 'security'
           ? 'Безопасность'
         : screen === 'chats'
@@ -440,7 +483,9 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
     screen === 'home'
       ? 'Разделы настроек'
       : screen === 'profile'
-        ? 'Твой ID и сетевой статус'
+        ? 'Имя, аватар, описание'
+        : screen === 'network'
+          ? 'Твой ID и сетевой статус'
         : screen === 'security'
           ? 'Шифрование и защита данных'
         : screen === 'chats'
@@ -473,21 +518,22 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
             >
               {screen === 'home' ? (
                 <>
-                  <div className="grid gap-3">
-                    <ActionCard icon={Shield} title="Профиль и сеть" subtitle={`Твой ID и статус (${online ? 'онлайн' : 'оффлайн'})`} onClick={() => setScreen('profile')} />
+                  <ProfileCard user={auth.user} onClick={() => setScreen('profile')} />
+                  <div className="grid gap-2">
                     <ActionCard icon={Lock} title="Безопасность" subtitle="Wipe-on-Close, Duress-пароль, шифрование" onClick={() => setScreen('security')} />
                     <ActionCard icon={MessageSquare} title="Чаты" subtitle="Настройка чатов, синхронизация, очистка" onClick={() => setScreen('chats')} />
                     <ActionCard icon={Bell} title="Уведомления" subtitle={notifPermission === 'granted' ? 'Разрешены' : 'Настройка разрешений'} onClick={() => setScreen('notifications')} />
                     <ActionCard icon={Palette} title="Внешний вид" subtitle="Темы и цвет акцента" onClick={() => setScreen('appearance')} />
                     <ActionCard icon={Mic2} title="Микрофон" subtitle="Устройство, эффекты и тест" onClick={() => setScreen('mic')} />
                     <ActionCard icon={Zap} title="Энергосбережение" subtitle="Уменьшить blur и анимации" onClick={() => setScreen('power')} />
+                    <ActionCard icon={PlugZap} title="Сеть" subtitle={`ID и сигналинг (${online ? 'онлайн' : 'оффлайн'})`} onClick={() => setScreen('network')} />
                     <ActionCard icon={Cpu} title="Диагностика" subtitle="PWA и Web Worker" onClick={() => setScreen('diagnostics')} />
                   </div>
                 </>
               ) : null}
 
               {screen === 'profile' ? (
-                <Section icon={Shield} title="Профиль и сеть" subtitle="Твой уникальный ID для друзей">
+                <Section icon={UserRound} title="Профиль" subtitle="Имя, аватар и описание">
                   <Row label="Профиль">
                     <div className="flex items-center gap-3">
                       {auth.user?.avatarDataUrl ? (
@@ -613,6 +659,11 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
                     {profileError ? <div className="text-xs font-semibold text-[rgb(var(--orb-danger-rgb))]">{profileError}</div> : null}
                   </div>
 
+                </Section>
+              ) : null}
+
+              {screen === 'network' ? (
+                <Section icon={PlugZap} title="Сеть" subtitle="Твой уникальный ID для друзей">
                   <Row label="Твой ID (поделись с друзьями)">
                     <div className="flex items-center gap-2">
                       <div className="max-w-[220px] truncate rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/45 px-3 py-2 font-mono text-xs text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] sm:max-w-[420px]">
