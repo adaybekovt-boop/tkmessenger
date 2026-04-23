@@ -1,0 +1,526 @@
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { registerSW } from 'virtual:pwa-register';
+import { Download, Gamepad2, Loader2, MessageSquare, Send, Settings2, X } from 'lucide-react';
+import OrbitsLogo from './components/OrbitsLogo.jsx';
+import Onboarding from './components/Onboarding.jsx';
+
+// Lazy-loaded pages — each gets its own chunk, loaded on first navigation.
+// Importer fns are exported alongside the components so we can warm the
+// chunk cache on boot (see the idle-preload effect in App). Without this
+// the first tap on a tab shows the Suspense spinner for a frame, which
+// reads as a flash between screens.
+const loadChats = () => import('./pages/Chats.jsx');
+const loadDrop = () => import('./pages/Drop.jsx');
+const loadGames = () => import('./pages/Games.jsx');
+const loadSettings = () => import('./pages/Settings.jsx');
+const Chats = lazy(loadChats);
+const DropView = lazy(loadDrop);
+const GamesView = lazy(loadGames);
+const Settings = lazy(loadSettings);
+import { PeerProvider } from './context/PeerContext.jsx';
+import { useAuth } from './context/AuthContext.jsx';
+import { useVisualViewport } from './hooks/useVisualViewport.js';
+import { hapticTap } from './core/haptics.js';
+import CallOverlay from './components/CallOverlay.jsx';
+import { PageTransition } from './components/PageTransition.jsx';
+import { usePeerContext } from './context/PeerContext.jsx';
+import { requestPersistentStorage, startStorageMonitor } from './core/storageCheck.js';
+import { cx } from './utils/common.js';
+
+function TabButton({ active, icon: Icon, label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        'relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 transition-all duration-200 active:scale-95',
+        active
+          ? 'text-[rgb(var(--orb-accent-rgb))]'
+          : 'text-[rgb(var(--orb-muted-rgb))] hover:text-[rgb(var(--orb-text-rgb))]'
+      )}
+    >
+      {active && (
+        <motion.div
+          layoutId="nav-indicator"
+          className="absolute inset-0 rounded-xl bg-[rgb(var(--orb-accent-rgb))]/10"
+          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+          style={{ zIndex: -1 }}
+        />
+      )}
+      <div className="relative">
+        <Icon className="h-5 w-5" strokeWidth={active ? 2.2 : 1.5} />
+      </div>
+      <span className={cx('mt-0.5 text-[10px] leading-tight', active ? 'font-semibold' : 'font-normal')}>{label}</span>
+    </button>
+  );
+}
+
+function IntroOverlay({ open }) {
+  // No more artificial setTimeout. The overlay is only shown while
+  // `auth.authState === 'loading'`, which flips synchronously in AuthProvider's
+  // first effect — so on returning visits the splash is barely a frame long
+  // and the fade-out animation carries the visual polish. On a truly cold
+  // launch (slow disk / Suspense chunks) it stays up until auth resolves.
+  return (
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="absolute inset-0 z-50 grid place-items-center bg-[rgb(var(--orb-bg-rgb))]"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, filter: 'blur(6px)' }}
+            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, scale: 1.06, filter: 'blur(10px)' }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="flex flex-col items-center gap-4"
+          >
+            <OrbitsLogo />
+            <div className="text-xs text-[rgb(var(--orb-muted-rgb))]">Загрузка…</div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function CallOverlayMount() {
+  const peer = usePeerContext();
+  // Keep CallOverlay out of the tree entirely while idle. The component
+  // previously always rendered (returning null), but its useEffects for
+  // video refs, fullscreen, haptics etc. still ran on every call-state
+  // update. Unmounting while idle means zero work until a call actually
+  // starts.
+  //
+  // `status` is always defined — useCallSession seeds the initial state
+  // via `createInitialCallState()` (CallStatus.IDLE) and `peer.call` is a
+  // literal object in usePeer's return, so no undefined branch to guard.
+  const status = peer.call.state.status;
+  if (status === 'idle') return null;
+  return <CallOverlay call={peer.call} />;
+}
+
+function PeerStatusPill() {
+  const peer = usePeerContext();
+  const labels = {
+    initializing: 'инициализация',
+    connecting: 'подключение…',
+    connected: 'подключено',
+    disconnected: 'нет сети',
+    disabled: 'выключено',
+    multitab: 'другая вкладка',
+    unsupported: 'не поддерживается'
+  };
+  const hasError = !!peer.error;
+  const text = hasError ? `ошибка: ${peer.error}` : (labels[peer.status] || peer.status);
+  if (!text || peer.status === 'connected') return null;
+  // Only use the danger palette for real errors. Soft transitional states
+  // (connecting, initializing, disconnected) sit in a muted pill so a
+  // flapping signaling server doesn't read as "something is broken".
+  const cls = hasError
+    ? 'bg-[rgb(var(--orb-danger-rgb))]/10 text-[rgb(var(--orb-danger-rgb))] ring-[rgb(var(--orb-danger-rgb))]/20'
+    : 'bg-[rgb(var(--orb-muted-rgb))]/10 text-[rgb(var(--orb-muted-rgb))] ring-[rgb(var(--orb-muted-rgb))]/20';
+  return (
+    <div className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${cls}`}>
+      {text}
+    </div>
+  );
+}
+
+export default function App() {
+  const auth = useAuth();
+  useVisualViewport();
+  const [tab, setTab] = useState('chats');
+  const [swState, setSwState] = useState({ status: 'инициализация', needRefresh: false, offlineReady: false });
+  const [reloadNowFn, setReloadNowFn] = useState(() => () => {});
+  const [checkUpdateFn, setCheckUpdateFn] = useState(() => () => {});
+
+  // Theme state now lives in <ThemeProvider> (src/themes/ThemeProvider.jsx).
+  // Settings reads it via useTheme() directly — no props drilling here.
+  //
+  // Initial value priority:
+  //   1. Explicit user choice in localStorage ('1' on / '0' off) — always wins.
+  //   2. Otherwise mirror the OS `prefers-reduced-motion` preference so users
+  //      on Low Power Mode / Reduce Motion land on low-anim mode out of the
+  //      box without having to dig into Settings first.
+  const [powerSaver, setPowerSaver] = useState(() => {
+    const stored = localStorage.getItem('orbits_power_saver');
+    if (stored === '1') return true;
+    if (stored === '0') return false;
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (_) {
+      return false;
+    }
+  });
+
+  // Phase 3.3 — Install Prompt
+  const installPromptRef = useRef(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [installBannerDismissed, setInstallBannerDismissed] = useState(() => localStorage.getItem('orbits_pwa_dismissed') === '1');
+
+  // Phase 2.3 — Storage Warning
+  const [storageWarning, setStorageWarning] = useState(null);
+
+  // Auto-lock: lock vault after 5 min of hidden tab
+  useEffect(() => {
+    if (auth.authState !== 'authed') return;
+    let lockTimer = null;
+    const onVisibility = () => {
+      if (document.hidden) {
+        const autoLock = localStorage.getItem('orbits_auto_lock') !== '0';
+        if (autoLock) {
+          lockTimer = setTimeout(() => {
+            auth.logout();
+          }, 5 * 60 * 1000);
+        }
+      } else {
+        if (lockTimer) {
+          clearTimeout(lockTimer);
+          lockTimer = null;
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (lockTimer) clearTimeout(lockTimer);
+    };
+  }, [auth.authState, auth]);
+
+  // Phase 3.5 — Notification Permission
+  const [notifPermission, setNotifPermission] = useState(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  );
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (powerSaver) root.classList.add('orb-reduce');
+    else root.classList.remove('orb-reduce');
+    localStorage.setItem('orbits_power_saver', powerSaver ? '1' : '0');
+  }, [powerSaver]);
+
+  // Follow OS `prefers-reduced-motion` changes while the app is running.
+  // Flipping the OS toggle to "reduce" (or iOS Low Power Mode, which the
+  // system aliases to reduce-motion) auto-enables power-saver so heavy CSS
+  // animations and Framer transitions calm down immediately — no restart
+  // required. We never auto-disable: once the user explicitly toggles
+  // power-saver off in Settings, that wins.
+  useEffect(() => {
+    let mq;
+    try { mq = window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) { return; }
+    if (!mq) return;
+    const onChange = (e) => {
+      if (e.matches) setPowerSaver(true);
+    };
+    // Safari < 14 / older WebKit only expose addListener/removeListener.
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange);
+      else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const updateSW = registerSW({
+        immediate: true,
+        onRegistered(registration) {
+          setSwState((s) => ({
+            ...s,
+            status: 'зарегистрирован',
+            offlineReady: s.offlineReady || (registration?.active?.state === 'activated')
+          }));
+        },
+        onRegisterError() {
+          setSwState((s) => ({ ...s, status: 'ошибка регистрации' }));
+        },
+        onNeedRefresh() {
+          setSwState((s) => ({ ...s, needRefresh: true }));
+        },
+        onOfflineReady() {
+          setSwState((s) => ({ ...s, offlineReady: true, status: 'зарегистрирован' }));
+        }
+      });
+      setReloadNowFn(() => () => updateSW(true));
+      setCheckUpdateFn(() => () => updateSW(false));
+    } catch (_) {
+      setSwState((s) => ({ ...s, status: 'PWA недоступно' }));
+    }
+    // Fallback: if no callback fires within 5s, check navigator.serviceWorker
+    const fallbackTimer = setTimeout(() => {
+      setSwState((s) => {
+        if (s.status !== 'инициализация') return s;
+        const hasController = !!navigator?.serviceWorker?.controller;
+        return {
+          ...s,
+          status: hasController ? 'зарегистрирован' : 'не поддерживается',
+          offlineReady: hasController
+        };
+      });
+    }, 5000);
+    return () => clearTimeout(fallbackTimer);
+  }, []);
+
+  // Phase 3.3 — beforeinstallprompt
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      installPromptRef.current = e;
+      setCanInstall(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    // Detect when app is installed
+    const onInstalled = () => {
+      setCanInstall(false);
+      installPromptRef.current = null;
+    };
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  // Phase 2.3 — Storage monitor (iOS Safari limits)
+  useEffect(() => {
+    const cancel = startStorageMonitor((result) => {
+      setStorageWarning(result);
+    });
+    // Request persistent storage to avoid data eviction
+    void requestPersistentStorage();
+    return cancel;
+  }, []);
+
+  // Warm every tab's chunk during idle time so tab switches don't show
+  // the Suspense spinner mid-navigation. Chats is the default tab and
+  // already loads at boot; the others (Drop, Games, Settings) get
+  // fetched right after the first idle frame.
+  useEffect(() => {
+    const idle = (cb) =>
+      (typeof window !== 'undefined' && window.requestIdleCallback)
+        ? window.requestIdleCallback(cb, { timeout: 2500 })
+        : setTimeout(cb, 600);
+    const cancel = (id) =>
+      (typeof window !== 'undefined' && window.cancelIdleCallback)
+        ? window.cancelIdleCallback(id)
+        : clearTimeout(id);
+    const handle = idle(() => {
+      try { void loadDrop(); } catch (_) {}
+      try { void loadGames(); } catch (_) {}
+      try { void loadSettings(); } catch (_) {}
+    });
+    return () => cancel(handle);
+  }, []);
+
+  const handleInstall = useCallback(async () => {
+    const prompt = installPromptRef.current;
+    if (!prompt) return;
+    try {
+      await prompt.prompt();
+      const result = await prompt.userChoice;
+      if (result?.outcome === 'accepted') {
+        setCanInstall(false);
+        installPromptRef.current = null;
+      }
+    } catch (_) {
+    }
+  }, []);
+
+  const requestNotifPermission = useCallback(async () => {
+    if (typeof Notification === 'undefined') return;
+    try {
+      const perm = await Notification.requestPermission();
+      setNotifPermission(perm);
+    } catch (_) {
+    }
+  }, []);
+
+  const view = (() => {
+    if (tab === 'drop') return <DropView />;
+    if (tab === 'games') return <GamesView />;
+    if (tab === 'settings') {
+      return (
+        <Settings
+          swState={swState}
+          onCheckUpdate={checkUpdateFn}
+          onReloadNow={reloadNowFn}
+          powerSaver={powerSaver}
+          setPowerSaver={setPowerSaver}
+          notifPermission={notifPermission}
+          requestNotifPermission={requestNotifPermission}
+        />
+      );
+    }
+    return <Chats />;
+  })();
+
+  if (auth.authState === 'loading') {
+    return (
+      <div
+        className="orb-page-bg relative w-full overflow-hidden bg-[rgb(var(--orb-bg-rgb))]"
+        style={{
+          height: 'calc(var(--orb-vvh, 1vh) * 100)',
+          transform: 'translateY(var(--orb-vv-offset-top, 0px))',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)'
+        }}
+      >
+        <IntroOverlay open />
+      </div>
+    );
+  }
+
+  if (auth.authState !== 'authed') {
+    return <Onboarding />;
+  }
+
+  return (
+    <PeerProvider>
+      <div
+        className="orb-page-bg relative w-full overflow-hidden bg-[rgb(var(--orb-bg-rgb))]"
+        style={{
+          height: 'calc(var(--orb-vvh, 1vh) * 100)',
+          // Re-align the shell with the visible area on iOS Safari versions
+          // that scroll the visual viewport instead of resizing layout when
+          // the keyboard opens. Zero on modern browsers — no-op.
+          transform: 'translateY(var(--orb-vv-offset-top, 0px))',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)'
+        }}
+      >
+        <CallOverlayMount />
+
+        {/* Floating status pill — only shows when disconnected */}
+        <div className="pointer-events-none absolute left-0 right-0 top-[max(4px,env(safe-area-inset-top))] z-30 flex justify-center">
+          <div className="pointer-events-auto">
+            <PeerStatusPill />
+          </div>
+        </div>
+
+        <main
+          className="w-full overflow-hidden"
+          style={{ height: 'calc((var(--orb-vvh, 1vh) * 100) - var(--orb-nav-h, 64px))' }}
+        >
+          <div className="h-full w-full relative">
+            <PageTransition pageKey={tab}>
+              <Suspense fallback={
+                <div className="flex h-full w-full items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--orb-muted-rgb))]" />
+                </div>
+              }>
+                {view}
+              </Suspense>
+            </PageTransition>
+
+            {/* Floating banners overlay */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 px-4 pb-3">
+              <AnimatePresence>
+                {canInstall && !installBannerDismissed ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="pointer-events-auto w-full max-w-md rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/90 px-4 py-3 shadow-xl backdrop-blur-xl ring-1 ring-white/[0.08]"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-[rgb(var(--orb-text-rgb))]">
+                        <Download className="h-4 w-4 text-[rgb(var(--orb-accent-rgb))]" />
+                        <span>Установить на главный экран?</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { hapticTap(); void handleInstall(); }}
+                          className="rounded-full orb-gradient px-4 py-1.5 text-[11px] font-medium text-white shadow-lg shadow-[rgb(var(--orb-accent-rgb))]/20 transition-all duration-200"
+                        >
+                          Установить
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { localStorage.setItem('orbits_pwa_dismissed', '1'); setInstallBannerDismissed(true); }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[rgb(var(--orb-muted-rgb))] hover:text-[rgb(var(--orb-text-rgb))]"
+                          aria-label="Закрыть"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {swState.needRefresh ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="pointer-events-auto w-full max-w-md rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/90 px-4 py-3 shadow-xl backdrop-blur-xl ring-1 ring-white/[0.08]"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs text-[rgb(var(--orb-text-rgb))]">Доступна новая версия</div>
+                      <button
+                        type="button"
+                        onClick={() => { hapticTap(); reloadNowFn(); }}
+                        className="rounded-full bg-[rgb(var(--orb-success-rgb))] px-4 py-1.5 text-[11px] font-medium text-white transition-colors duration-200"
+                      >
+                        Обновить
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {storageWarning ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="pointer-events-auto w-full max-w-md rounded-2xl bg-[rgb(var(--orb-danger-rgb))]/10 px-4 py-3 shadow-xl backdrop-blur-xl ring-1 ring-[rgb(var(--orb-danger-rgb))]/20"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs text-[rgb(var(--orb-text-rgb))]">
+                        Хранилище: {Math.round((storageWarning.ratio || 0) * 100)}% ({storageWarning.usageMB}MB / {storageWarning.quotaMB}MB)
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setStorageWarning(null)}
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[rgb(var(--orb-muted-rgb))] active:scale-95"
+                        aria-label="Закрыть"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          </div>
+        </main>
+
+        <nav
+          className="orb-nav-bar flex h-[64px] items-center gap-1 overflow-hidden border-t border-white/[0.06] bg-[rgb(var(--orb-bg-rgb))]/95 px-6 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl"
+          role="navigation"
+          aria-label="Навигация"
+        >
+          <TabButton active={tab === 'chats'} icon={MessageSquare} label="Чаты" onClick={() => { hapticTap(); setTab('chats'); }} />
+          <TabButton active={tab === 'drop'} icon={Send} label="Drop" onClick={() => { hapticTap(); setTab('drop'); }} />
+          <TabButton active={tab === 'games'} icon={Gamepad2} label="Игры" onClick={() => { hapticTap(); setTab('games'); }} />
+          <TabButton active={tab === 'settings'} icon={Settings2} label="Ещё" onClick={() => { hapticTap(); setTab('settings'); }} />
+        </nav>
+      </div>
+    </PeerProvider>
+  );
+}
