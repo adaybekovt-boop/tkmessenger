@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, useMotionValue, useTransform, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { hapticTap } from '../core/haptics.js';
 import { Activity, Bell, Check, ChevronLeft, ClipboardCopy, Cpu, Flower2, Globe2, Layers, Lock, LogOut, MessageSquare, Mic2, Moon, Music2, Palette, Play, PlugZap, RefreshCw, Shield, SlidersHorizontal, Sparkles, Trash2, UserRound, Zap } from 'lucide-react';
 import { useOrbitsWorker } from '../hooks/useOrbitsWorker.js';
@@ -177,134 +177,33 @@ function ActionCard({ icon: Icon, title, subtitle, onClick, tone }) {
 //                ref, so this component only mounts once the element is
 //                real.
 //   onClick    — tap opens the profile editor
-function ProfileStretchyHeader({ user, scrollEl, onClick }) {
+// Compact profile header that pins to the top of the Settings scroll
+// area. No morph / no stretch — just a round avatar + name that stays
+// visible as the user scrolls through the settings list, the same way
+// Telegram's profile tab header behaves.
+//
+// Props:
+//   user     — { displayName, username, avatarDataUrl }
+//   onClick  — tap opens the profile editor
+function ProfileStretchyHeader({ user, onClick }) {
   const display = user?.displayName || user?.username || 'Orbits';
   const username = user?.username ? `@${user.username}` : '';
   const letter = String(display).trim().charAt(0).toUpperCase() || 'O';
   const [avatarBroken, setAvatarBroken] = useState(false);
 
-  // Scroll range over which the morph happens. 0 = fully expanded
-  // banner; MORPH = fully collapsed compact row.
-  const MORPH = 220;
-
-  // Respect OS Low-Power / reduce-motion. The compositor-driven
-  // transforms aren't caught by MotionConfig's reducedMotion flag
-  // (MotionValue-driven styles sidestep it), so we gate them manually
-  // and fall back to the compact layout when reduce-motion is on.
-  const shouldReduce = useReducedMotion();
-
-  // Drive the morph off a raw DOM scroll listener instead of
-  // framer-motion's useScroll. useScroll latches onto the container
-  // internally and — on some iOS PWA builds — never fires for sticky
-  // descendants, which left the banner frozen at its expanded size
-  // while the list scrolled behind it (the "avatar hangs over the
-  // first row" bug). A direct scroll handler + rAF throttle is
-  // straightforward and correct.
-  const scrollMV = useMotionValue(0);
-  useEffect(() => {
-    if (!scrollEl) return;
-    let raf = 0;
-    const read = () => {
-      raf = 0;
-      scrollMV.set(scrollEl.scrollTop || 0);
-    };
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(read);
-    };
-    // Prime once on attach so the initial MotionValue matches reality
-    // (otherwise we'd flash the expanded banner when the user returns
-    // to Settings mid-scroll).
-    read();
-    scrollEl.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      scrollEl.removeEventListener('scroll', onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [scrollEl, scrollMV]);
-
-  // All MotionValues are derived at the top of the component — never
-  // inside style={{}} in the JSX tree — so subscriptions don't leak on
-  // every re-render. The photo + name + vertical padding have to add up
-  // to no more than headerHeight or overflow-hidden will clip the top
-  // of the avatar (that was the "avatar sticks into Безопасность" bug).
-  //   expanded:  16 (top) + 200 (photo) + 8 + 44 (name) + 12 (bottom) = 280
-  //   collapsed:  8 (top) +  56 (photo) + 8 + 24 (name) = 96
-  const headerHeight = useTransform(scrollMV, [0, MORPH], [280, 96]);
-  const photoSize = useTransform(scrollMV, [0, MORPH], [200, 56]);
-  const photoRadius = useTransform(scrollMV, [0, MORPH], ['22px', '50%']);
-  const bannerOpacity = useTransform(scrollMV, [0, MORPH * 0.8], [1, 0]);
-  const nameScale = useTransform(scrollMV, [0, MORPH], [1, 0.7]);
-
-  // Static reduce-motion fallback — medium-compact hero, no scroll binding.
-  if (shouldReduce) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label="Открыть профиль"
-        style={{ touchAction: 'manipulation' }}
-        className="sticky top-0 z-10 flex w-full flex-col items-center justify-end overflow-hidden bg-[rgb(var(--orb-bg-rgb))]/85 px-3 pt-4 pb-3 text-center backdrop-blur-sm"
-      >
-        <div className="relative h-[120px] w-[120px] overflow-hidden rounded-full ring-2 ring-white/10">
-          {user?.avatarDataUrl && !avatarBroken ? (
-            <img
-              alt=""
-              src={user.avatarDataUrl}
-              onError={() => setAvatarBroken(true)}
-              className="h-full w-full object-cover"
-              draggable={false}
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[rgb(var(--orb-accent-rgb))]/40 to-[rgb(var(--orb-accent2-rgb))]/40 text-3xl font-semibold text-[rgb(var(--orb-text-rgb))]">
-              {letter}
-            </div>
-          )}
-        </div>
-        <div className="mt-2 truncate text-lg font-semibold text-[rgb(var(--orb-text-rgb))]">{display}</div>
-        {username ? (
-          <div className="mt-0.5 truncate text-xs text-[rgb(var(--orb-muted-rgb))]">{username}</div>
-        ) : null}
-      </button>
-    );
-  }
-
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onClick}
       aria-label="Открыть профиль"
-      // sticky top:0 — pins the header so as the list scrolls up the
-      // height/scale MotionValues below collapse it into a compact bar
-      // that stays in place. Without sticky it just scrolled away.
-      // justify-start (not justify-end) + padding-top gives a stable
-      // top anchor — justify-end was packing content to the bottom of
-      // the shrinking container, so the photo's top spilled out above
-      // the clip boundary. With justify-start the photo starts from
-      // the top and the overall height simply shrinks around it.
-      // touch-action: manipulation — removes the 300ms tap delay on
-      // old Android WebViews so the tap feels native.
-      className="sticky top-0 z-10 flex w-full flex-col items-center overflow-hidden bg-[rgb(var(--orb-bg-rgb))] pt-4 text-center"
-      style={{ height: headerHeight, touchAction: 'manipulation' }}
+      // sticky top:0 pins the header inside the scroll container — the
+      // list scrolls underneath, the avatar + name stay visible up top.
+      // Solid background means the rows passing behind don't bleed
+      // through when they share the sticky slot.
+      className="sticky top-0 z-10 flex w-full flex-col items-center bg-[rgb(var(--orb-bg-rgb))] px-3 pt-4 pb-3 text-center"
+      style={{ touchAction: 'manipulation' }}
     >
-      {/* Full-bleed banner tint. Fades as the header collapses so it
-          doesn't leave a gradient stripe across the list. */}
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[rgb(var(--orb-accent-rgb))]/15 via-[rgb(var(--orb-accent2-rgb))]/5 to-transparent"
-        style={{ opacity: bannerOpacity }}
-      />
-
-      <motion.div
-        className="relative overflow-hidden ring-2 ring-white/10"
-        style={{
-          width: photoSize,
-          height: photoSize,
-          borderRadius: photoRadius,
-        }}
-      >
+      <div className="relative h-24 w-24 overflow-hidden rounded-full ring-2 ring-white/10">
         {user?.avatarDataUrl && !avatarBroken ? (
           <img
             alt=""
@@ -316,22 +215,16 @@ function ProfileStretchyHeader({ user, scrollEl, onClick }) {
             decoding="async"
           />
         ) : (
-          <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[rgb(var(--orb-accent-rgb))]/40 to-[rgb(var(--orb-accent2-rgb))]/40 text-4xl font-semibold text-[rgb(var(--orb-text-rgb))]">
+          <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[rgb(var(--orb-accent-rgb))]/40 to-[rgb(var(--orb-accent2-rgb))]/40 text-3xl font-semibold text-[rgb(var(--orb-text-rgb))]">
             {letter}
           </div>
         )}
-      </motion.div>
-
-      <motion.div
-        className="mt-2 px-3"
-        style={{ scale: nameScale, transformOrigin: 'center top' }}
-      >
-        <div className="truncate text-lg font-semibold text-[rgb(var(--orb-text-rgb))]">{display}</div>
-        {username ? (
-          <div className="mt-0.5 truncate text-xs text-[rgb(var(--orb-muted-rgb))]">{username}</div>
-        ) : null}
-      </motion.div>
-    </motion.button>
+      </div>
+      <div className="mt-2 max-w-full truncate text-lg font-semibold text-[rgb(var(--orb-text-rgb))]">{display}</div>
+      {username ? (
+        <div className="mt-0.5 max-w-full truncate text-xs text-[rgb(var(--orb-muted-rgb))]">{username}</div>
+      ) : null}
+    </button>
   );
 }
 
@@ -645,22 +538,15 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
   const subtitle = labels.subtitle;
 
   const back = screen === 'home' ? null : () => setScreen('home');
-  // Callback-ref + state. Framer Motion's `useScroll({ container })`
-  // grabs the DOM element at init and doesn't re-subscribe, so we need
-  // the stretchy header to mount only AFTER the scroll container is in
-  // the DOM. This `scrollEl` state gets populated on attach and the
-  // following render mounts the header with the real element.
-  const [scrollEl, setScrollEl] = useState(null);
 
   return (
     <div className="orb-page-bg flex h-full w-full flex-col overflow-hidden bg-[rgb(var(--orb-bg-rgb))]">
-      {/* Hide the usual NavHeader on the home screen — the stretchy
-          profile header doubles as the hero area, a separate title
-          strip above it would just crowd the top. */}
+      {/* Hide the usual NavHeader on the home screen — the profile
+          header pinned at the top of the scroll area doubles as the
+          hero, a separate title strip would just crowd things. */}
       {screen === 'home' ? null : <NavHeader title={title} subtitle={subtitle} onBack={back} />}
 
       <div
-        ref={setScrollEl}
         className="orb-scroll flex-1 overflow-y-auto"
         style={{
           // Only lock horizontal overscroll — vertical rubber-band must
@@ -681,13 +567,9 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
         }}
       >
         <div className="mx-auto w-full max-w-4xl">
-          {/* Mount the stretchy header only once `scrollEl` is attached —
-              prevents framer-motion's `useScroll` from latching onto the
-              window fallback on the first render. */}
-          {screen === 'home' && scrollEl ? (
+          {screen === 'home' ? (
             <ProfileStretchyHeader
               user={auth.user}
-              scrollEl={scrollEl}
               onClick={() => { hapticTap(); setScreen('profile'); }}
             />
           ) : null}
