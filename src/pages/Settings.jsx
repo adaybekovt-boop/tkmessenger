@@ -177,10 +177,10 @@ function ActionCard({ icon: Icon, title, subtitle, onClick, tone }) {
 //                ref, so this component only mounts once the element is
 //                real.
 //   onClick    — tap opens the profile editor
-// Compact profile header that pins to the top of the Settings scroll
-// area. No morph / no stretch — just a round avatar + name that stays
-// visible as the user scrolls through the settings list, the same way
-// Telegram's profile tab header behaves.
+// Compact profile header placed as a *sibling* of the scroll container
+// (not inside it) so the row is structurally fixed at the top of
+// Settings — the list below scrolls independently, the header never
+// moves. Same idea as the chat header.
 //
 // Props:
 //   user     — { displayName, username, avatarDataUrl }
@@ -196,11 +196,7 @@ function ProfileStretchyHeader({ user, onClick }) {
       type="button"
       onClick={onClick}
       aria-label="Открыть профиль"
-      // sticky top:0 pins the header inside the scroll container — the
-      // list scrolls underneath, the avatar + name stay visible up top.
-      // Solid background means the rows passing behind don't bleed
-      // through when they share the sticky slot.
-      className="sticky top-0 z-10 flex w-full flex-col items-center bg-[rgb(var(--orb-bg-rgb))] px-3 pt-4 pb-3 text-center"
+      className="flex w-full shrink-0 flex-col items-center bg-[rgb(var(--orb-bg-rgb))] px-3 pt-4 pb-3 text-center"
       style={{ touchAction: 'manipulation' }}
     >
       <div className="relative h-24 w-24 overflow-hidden rounded-full ring-2 ring-white/10">
@@ -542,38 +538,35 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
   return (
     <div className="orb-page-bg flex h-full w-full flex-col overflow-hidden bg-[rgb(var(--orb-bg-rgb))]">
       {/* Hide the usual NavHeader on the home screen — the profile
-          header pinned at the top of the scroll area doubles as the
-          hero, a separate title strip would just crowd things. */}
+          header pinned at the top doubles as the hero. */}
       {screen === 'home' ? null : <NavHeader title={title} subtitle={subtitle} onBack={back} />}
+
+      {/* Profile header lives OUTSIDE the scroll container. That way it
+          is structurally fixed at the top of the Settings pane (same
+          layout pattern as the chat header) — the list below scrolls
+          independently and the header never moves with the finger. No
+          position:sticky fragility. */}
+      {screen === 'home' ? (
+        <ProfileStretchyHeader
+          user={auth.user}
+          onClick={() => { hapticTap(); setScreen('profile'); }}
+        />
+      ) : null}
 
       <div
         className="orb-scroll flex-1 overflow-y-auto"
         style={{
-          // Only lock horizontal overscroll — vertical rubber-band must
-          // stay available so the stretchy header can actually stretch
-          // on pull-down. `contain` on both axes would freeze the whole
-          // stretchy effect.
           overscrollBehaviorX: 'contain',
           overscrollBehaviorY: 'auto',
           // NO top safe-area here — the outer app shell in App.jsx
-          // already applies `paddingTop: env(safe-area-inset-top)`, so
-          // adding it again double-pads and shifts the sticky compact
-          // bar (and its pull-down tint zone) below the notch. Bottom
-          // safe-area IS useful because on keyboard-open the bottom tab
-          // nav collapses to 0 height (see `html[data-keyboard='1']
-          // .orb-nav-bar` in index.css) and content would otherwise run
-          // into the home-indicator gesture area.
+          // already applies `paddingTop: env(safe-area-inset-top)`.
+          // Bottom safe-area keeps content above the home-indicator
+          // gesture area when the tab nav collapses on keyboard open.
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
         <div className="mx-auto w-full max-w-4xl">
-          {screen === 'home' ? (
-            <ProfileStretchyHeader
-              user={auth.user}
-              onClick={() => { hapticTap(); setScreen('profile'); }}
-            />
-          ) : null}
-          <div className={cx('relative', screen === 'home' ? 'px-4 pb-4' : 'px-4 py-4')}>
+          <div className={cx('relative', screen === 'home' ? 'px-4 pb-4 pt-2' : 'px-4 py-4')}>
             <motion.div
               key={screen}
               initial={{ opacity: 0, y: 8 }}
