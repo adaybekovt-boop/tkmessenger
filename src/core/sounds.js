@@ -1,6 +1,14 @@
 // sounds.js — programmatic sound effects via Web Audio API.
 // Each sound is generated with oscillators + gain envelopes — no audio files needed.
 // Respects the `sound` flag from notification settings (orbits_notif_settings_v1).
+//
+// Multiple *presets* are exposed so the user can pick the tone palette that
+// fits their environment (office vs. solo etc.):
+//   - classic : original two-tone dings
+//   - soft    : lower volume, softer attack, sine only
+//   - minimal : very short blips, barely audible
+//   - silent  : no audible output (haptic-only workflows)
+// The active preset is stored in localStorage under `orbits_sound_preset`.
 
 import { getNotifSettings } from './notifications.js';
 
@@ -26,92 +34,95 @@ export function preloadSounds() {
   }
 }
 
-// ─── Sound definitions ──────────────────────────────────────────────────────
+// ─── Primitive tone helper ──────────────────────────────────────────────────
 
-function playSend(ctx) {
-  // Short rising chirp — light, confirming.
-  const t = ctx.currentTime;
+function tone(ctx, { type = 'sine', freqStart, freqEnd, dur = 0.15, gain: peakGain = 0.12, delay = 0 }) {
+  const t = ctx.currentTime + delay;
   const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(600, t);
-  osc.frequency.exponentialRampToValueAtTime(1200, t + 0.08);
-  gain.gain.setValueAtTime(0, t);
-  gain.gain.linearRampToValueAtTime(0.12, t + 0.02);
-  gain.gain.linearRampToValueAtTime(0, t + 0.12);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(t);
-  osc.stop(t + 0.13);
-}
-
-function playReceive(ctx) {
-  // Two-tone descending ding — gentle, noticeable.
-  const t = ctx.currentTime;
-
-  const osc1 = ctx.createOscillator();
-  const g1 = ctx.createGain();
-  osc1.type = 'sine';
-  osc1.frequency.setValueAtTime(880, t);
-  g1.gain.setValueAtTime(0, t);
-  g1.gain.linearRampToValueAtTime(0.14, t + 0.02);
-  g1.gain.linearRampToValueAtTime(0, t + 0.15);
-  osc1.connect(g1);
-  g1.connect(ctx.destination);
-  osc1.start(t);
-  osc1.stop(t + 0.16);
-
-  const osc2 = ctx.createOscillator();
-  const g2 = ctx.createGain();
-  osc2.type = 'sine';
-  osc2.frequency.setValueAtTime(660, t + 0.1);
-  g2.gain.setValueAtTime(0, t + 0.1);
-  g2.gain.linearRampToValueAtTime(0.14, t + 0.12);
-  g2.gain.linearRampToValueAtTime(0, t + 0.28);
-  osc2.connect(g2);
-  g2.connect(ctx.destination);
-  osc2.start(t + 0.1);
-  osc2.stop(t + 0.29);
-}
-
-function playCall(ctx) {
-  // Gentle repeating double-beep (plays once — CallManager loops via Ringtone).
-  const t = ctx.currentTime;
-  for (let i = 0; i < 2; i++) {
-    const offset = i * 0.18;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(740, t + offset);
-    osc.frequency.exponentialRampToValueAtTime(520, t + offset + 0.12);
-    gain.gain.setValueAtTime(0, t + offset);
-    gain.gain.linearRampToValueAtTime(0.16, t + offset + 0.03);
-    gain.gain.linearRampToValueAtTime(0, t + offset + 0.16);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(t + offset);
-    osc.stop(t + offset + 0.17);
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freqStart, t);
+  if (freqEnd != null && freqEnd !== freqStart) {
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t + dur);
   }
-}
-
-function playError(ctx) {
-  // Low buzz — brief, unmistakable as an error.
-  const t = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(200, t);
-  osc.frequency.linearRampToValueAtTime(150, t + 0.15);
-  gain.gain.setValueAtTime(0, t);
-  gain.gain.linearRampToValueAtTime(0.10, t + 0.02);
-  gain.gain.linearRampToValueAtTime(0, t + 0.18);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peakGain, t + Math.min(0.03, dur * 0.2));
+  g.gain.linearRampToValueAtTime(0, t + dur);
+  osc.connect(g);
+  g.connect(ctx.destination);
   osc.start(t);
-  osc.stop(t + 0.19);
+  osc.stop(t + dur + 0.02);
 }
 
-const SOUNDS = { send: playSend, receive: playReceive, call: playCall, error: playError };
+// ─── Preset library ─────────────────────────────────────────────────────────
+
+// Each preset implements the same four actions so the caller doesn't care
+// which one is active.
+const PRESETS = {
+  classic: {
+    send:    (ctx) => tone(ctx, { freqStart: 600, freqEnd: 1200, dur: 0.12, gain: 0.12 }),
+    receive: (ctx) => {
+      tone(ctx, { freqStart: 880, dur: 0.15, gain: 0.14 });
+      tone(ctx, { freqStart: 660, dur: 0.18, gain: 0.14, delay: 0.1 });
+    },
+    call:    (ctx) => {
+      for (let i = 0; i < 2; i++) {
+        tone(ctx, { freqStart: 740, freqEnd: 520, dur: 0.16, gain: 0.16, delay: i * 0.18 });
+      }
+    },
+    error:   (ctx) => tone(ctx, { type: 'square', freqStart: 200, freqEnd: 150, dur: 0.18, gain: 0.10 }),
+  },
+  soft: {
+    send:    (ctx) => tone(ctx, { freqStart: 520, freqEnd: 780, dur: 0.14, gain: 0.07 }),
+    receive: (ctx) => {
+      tone(ctx, { freqStart: 660, dur: 0.2, gain: 0.08 });
+      tone(ctx, { freqStart: 520, dur: 0.22, gain: 0.08, delay: 0.12 });
+    },
+    call:    (ctx) => {
+      for (let i = 0; i < 2; i++) {
+        tone(ctx, { freqStart: 560, freqEnd: 440, dur: 0.2, gain: 0.10, delay: i * 0.22 });
+      }
+    },
+    error:   (ctx) => tone(ctx, { freqStart: 260, freqEnd: 200, dur: 0.2, gain: 0.07 }),
+  },
+  minimal: {
+    send:    (ctx) => tone(ctx, { freqStart: 1200, dur: 0.05, gain: 0.08 }),
+    receive: (ctx) => tone(ctx, { freqStart: 900, dur: 0.07, gain: 0.09 }),
+    call:    (ctx) => {
+      tone(ctx, { freqStart: 700, dur: 0.08, gain: 0.10 });
+      tone(ctx, { freqStart: 700, dur: 0.08, gain: 0.10, delay: 0.18 });
+    },
+    error:   (ctx) => tone(ctx, { type: 'square', freqStart: 180, dur: 0.08, gain: 0.08 }),
+  },
+  silent: {
+    send:    () => {},
+    receive: () => {},
+    call:    () => {},
+    error:   () => {},
+  },
+};
+
+const PRESET_KEY = 'orbits_sound_preset';
+
+export const SOUND_PRESETS = [
+  { id: 'classic', label: 'Классика' },
+  { id: 'soft',    label: 'Мягкий'   },
+  { id: 'minimal', label: 'Минимал'  },
+  { id: 'silent',  label: 'Без звука' },
+];
+
+export function getSoundPreset() {
+  try {
+    const raw = localStorage.getItem(PRESET_KEY);
+    if (raw && PRESETS[raw]) return raw;
+  } catch (_) {}
+  return 'classic';
+}
+
+export function setSoundPreset(id) {
+  if (!PRESETS[id]) return;
+  try { localStorage.setItem(PRESET_KEY, id); } catch (_) {}
+}
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
@@ -123,7 +134,8 @@ export function playSound(type) {
   try {
     const settings = getNotifSettings();
     if (!settings.sound) return;
-    const fn = SOUNDS[type];
+    const preset = PRESETS[getSoundPreset()] || PRESETS.classic;
+    const fn = preset[type];
     if (!fn) return;
     const ctx = getCtx();
     if (!ctx) return;

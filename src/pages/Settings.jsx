@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { hapticTap } from '../core/haptics.js';
-import { Activity, Bell, ChevronLeft, ClipboardCopy, Cpu, Flower2, Layers, Lock, LogOut, MessageSquare, Mic2, Moon, Palette, PlugZap, RefreshCw, Shield, SlidersHorizontal, Sparkles, Trash2, UserRound, Zap } from 'lucide-react';
+import { Activity, Bell, Check, ChevronLeft, ClipboardCopy, Cpu, Flower2, Globe2, Layers, Lock, LogOut, MessageSquare, Mic2, Moon, Music2, Palette, Play, PlugZap, RefreshCw, Shield, SlidersHorizontal, Sparkles, Trash2, UserRound, Zap } from 'lucide-react';
 import { useOrbitsWorker } from '../hooks/useOrbitsWorker.js';
 import { usePeerContext } from '../context/PeerContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -11,6 +11,8 @@ import { useTheme } from '../themes/ThemeProvider.jsx';
 import ChatSettings from '../components/ChatSettings.jsx';
 import { cx, formatTimestamp } from '../utils/common.js';
 import { getLocalIdentityFingerprint, shortFingerprint } from '../core/identityKey.js';
+import { LANGUAGES, getLang, setLang, useLang, t } from '../core/i18n.js';
+import { SOUND_PRESETS, getSoundPreset, setSoundPreset, playSound } from '../core/sounds.js';
 
 // Display metadata for the theme picker. Kept as a static table (instead of
 // read from the manifest) so the picker renders instantly without waiting on
@@ -310,6 +312,20 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
 
   const [screen, setScreen] = useState('home');
 
+  // Re-render when the active language changes anywhere so every `t(...)`
+  // call below picks up the new dictionary. useLang subscribes to the
+  // i18n store via useSyncExternalStore.
+  const currentLang = useLang();
+  const currentLanguageLabel = useMemo(
+    () => (LANGUAGES.find((l) => l.id === currentLang) || LANGUAGES[0]).native,
+    [currentLang]
+  );
+  const [currentSoundPreset, setCurrentSoundPreset] = useState(() => getSoundPreset());
+  const currentSoundPresetLabel = useMemo(
+    () => (SOUND_PRESETS.find((p) => p.id === currentSoundPreset) || SOUND_PRESETS[0]).label,
+    [currentSoundPreset]
+  );
+
   const [copied, setCopied] = useState(false);
   const peerIdLabel = peer.peerId || '…';
   const [storageEstimate, setStorageEstimate] = useState(null);
@@ -576,47 +592,25 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
     };
   }, [autoGainControl, echoCancellation, micDeviceId, micTesting, noiseSuppression]);
 
-  const title =
-    screen === 'home'
-      ? 'Настройки'
-      : screen === 'profile'
-        ? 'Профиль'
-        : screen === 'network'
-          ? 'Сеть'
-        : screen === 'security'
-          ? 'Безопасность'
-        : screen === 'chats'
-          ? 'Чаты'
-        : screen === 'appearance'
-          ? 'Внешний вид'
-          : screen === 'mic'
-            ? 'Микрофон'
-            : screen === 'notifications'
-              ? 'Уведомления'
-              : screen === 'power'
-                ? 'Энергосбережение'
-                : 'Диагностика';
-
-  const subtitle =
-    screen === 'home'
-      ? 'Разделы настроек'
-      : screen === 'profile'
-        ? 'Имя, аватар, описание'
-        : screen === 'network'
-          ? 'Твой ID и сетевой статус'
-        : screen === 'security'
-          ? 'Шифрование и защита данных'
-        : screen === 'chats'
-          ? 'Настройка чатов и история'
-        : screen === 'appearance'
-          ? 'Темы и акцент'
-          : screen === 'mic'
-            ? 'Устройство и тест уровня'
-            : screen === 'notifications'
-              ? 'Разрешения и предпочтения'
-              : screen === 'power'
-                ? 'Blur и анимации'
-                : 'PWA и Web Worker';
+  // Per-screen title / subtitle for the NavHeader. Driven through the
+  // i18n table so all future strings get translated in one place.
+  const SCREEN_LABELS = {
+    home:          { title: t('settings.title'),         subtitle: t('settings.sections') },
+    profile:       { title: t('settings.profile'),       subtitle: t('settings.profile.sub') },
+    network:       { title: t('settings.network'),       subtitle: t('settings.network.sub') },
+    security:      { title: t('settings.security'),      subtitle: t('settings.security.sub') },
+    chats:         { title: t('settings.chats'),         subtitle: t('settings.chats.sub') },
+    appearance:    { title: t('settings.appearance'),    subtitle: t('settings.appearance.sub') },
+    mic:           { title: t('settings.mic'),           subtitle: t('settings.mic.sub') },
+    notifications: { title: t('settings.notifications'), subtitle: 'Разрешения и предпочтения' },
+    power:         { title: t('settings.power'),         subtitle: t('settings.power.sub') },
+    diagnostics:   { title: t('settings.diagnostics'),   subtitle: t('settings.diagnostics.sub') },
+    language:      { title: t('settings.language'),      subtitle: t('settings.language.sub') },
+    sounds:        { title: t('settings.sounds'),        subtitle: t('settings.sounds.sub') },
+  };
+  const labels = SCREEN_LABELS[screen] || SCREEN_LABELS.home;
+  const title = labels.title;
+  const subtitle = labels.subtitle;
 
   const back = screen === 'home' ? null : () => setScreen('home');
   // Callback-ref + state. Framer Motion's `useScroll({ container })`
@@ -675,15 +669,98 @@ export default function Settings({ swState, onCheckUpdate, onReloadNow, powerSav
             >
               {screen === 'home' ? (
                 <div className="grid gap-2">
-                  <ActionCard icon={Lock} title="Безопасность" subtitle="Wipe-on-Close, Duress-пароль, шифрование" onClick={() => setScreen('security')} />
-                  <ActionCard icon={MessageSquare} title="Чаты" subtitle="Настройка чатов, синхронизация, очистка" onClick={() => setScreen('chats')} />
-                  <ActionCard icon={Bell} title="Уведомления" subtitle={notifPermission === 'granted' ? 'Разрешены' : 'Настройка разрешений'} onClick={() => setScreen('notifications')} />
-                  <ActionCard icon={Palette} title="Внешний вид" subtitle="Темы и цвет акцента" onClick={() => setScreen('appearance')} />
-                  <ActionCard icon={Mic2} title="Микрофон" subtitle="Устройство, эффекты и тест" onClick={() => setScreen('mic')} />
-                  <ActionCard icon={Zap} title="Энергосбережение" subtitle="Уменьшить blur и анимации" onClick={() => setScreen('power')} />
-                  <ActionCard icon={PlugZap} title="Сеть" subtitle={`ID и сигналинг (${online ? 'онлайн' : 'оффлайн'})`} onClick={() => setScreen('network')} />
-                  <ActionCard icon={Cpu} title="Диагностика" subtitle="PWA и Web Worker" onClick={() => setScreen('diagnostics')} />
+                  <ActionCard icon={Lock} title={t('settings.security')} subtitle={t('settings.security.sub')} onClick={() => setScreen('security')} />
+                  <ActionCard icon={MessageSquare} title={t('settings.chats')} subtitle={t('settings.chats.sub')} onClick={() => setScreen('chats')} />
+                  <ActionCard icon={Bell} title={t('settings.notifications')} subtitle={notifPermission === 'granted' ? 'Разрешены' : 'Настройка разрешений'} onClick={() => setScreen('notifications')} />
+                  <ActionCard icon={Music2} title={t('settings.sounds')} subtitle={currentSoundPresetLabel} onClick={() => setScreen('sounds')} />
+                  <ActionCard icon={Palette} title={t('settings.appearance')} subtitle={t('settings.appearance.sub')} onClick={() => setScreen('appearance')} />
+                  <ActionCard icon={Mic2} title={t('settings.mic')} subtitle={t('settings.mic.sub')} onClick={() => setScreen('mic')} />
+                  <ActionCard icon={Zap} title={t('settings.power')} subtitle={t('settings.power.sub')} onClick={() => setScreen('power')} />
+                  <ActionCard icon={Globe2} title={t('settings.language')} subtitle={currentLanguageLabel} onClick={() => setScreen('language')} />
+                  <ActionCard icon={PlugZap} title={t('settings.network')} subtitle={`${t('settings.network.sub')} (${online ? t('settings.online') : t('settings.offline')})`} onClick={() => setScreen('network')} />
+                  <ActionCard icon={Cpu} title={t('settings.diagnostics')} subtitle={t('settings.diagnostics.sub')} onClick={() => setScreen('diagnostics')} />
                 </div>
+              ) : null}
+
+              {screen === 'language' ? (
+                <Section icon={Globe2} title={t('settings.language')} subtitle={t('settings.language.sub')}>
+                  <div className="grid gap-2">
+                    {LANGUAGES.map((lang) => {
+                      const active = lang.id === currentLang;
+                      return (
+                        <button
+                          key={lang.id}
+                          type="button"
+                          onClick={() => { hapticTap(); setLang(lang.id); }}
+                          className={cx(
+                            'flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left ring-1 transition-colors duration-200',
+                            active
+                              ? 'bg-[rgb(var(--orb-accent-rgb))]/12 ring-[rgb(var(--orb-accent-rgb))]/40'
+                              : 'bg-[rgb(var(--orb-surface-rgb))]/30 ring-[rgb(var(--orb-border-rgb))]'
+                          )}
+                        >
+                          <div>
+                            <div className="text-sm font-medium text-[rgb(var(--orb-text-rgb))]">{lang.native}</div>
+                            <div className="mt-0.5 text-[11px] text-[rgb(var(--orb-muted-rgb))]">{lang.label}</div>
+                          </div>
+                          {active ? <Check className="h-4 w-4 text-[rgb(var(--orb-accent-rgb))]" /> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 text-[11px] text-[rgb(var(--orb-muted-rgb))]">
+                    Интерфейс Settings переведён сейчас; остальные разделы постепенно подтянутся.
+                  </div>
+                </Section>
+              ) : null}
+
+              {screen === 'sounds' ? (
+                <Section icon={Music2} title={t('settings.sounds')} subtitle={t('settings.sounds.sub')}>
+                  <div className="grid gap-2">
+                    {SOUND_PRESETS.map((p) => {
+                      const active = p.id === currentSoundPreset;
+                      return (
+                        <div
+                          key={p.id}
+                          className={cx(
+                            'flex items-center justify-between gap-3 rounded-2xl px-3 py-3 ring-1 transition-colors duration-200',
+                            active
+                              ? 'bg-[rgb(var(--orb-accent-rgb))]/12 ring-[rgb(var(--orb-accent-rgb))]/40'
+                              : 'bg-[rgb(var(--orb-surface-rgb))]/30 ring-[rgb(var(--orb-border-rgb))]'
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => { hapticTap(); setSoundPreset(p.id); setCurrentSoundPreset(p.id); }}
+                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium text-[rgb(var(--orb-text-rgb))]">{p.label}</div>
+                            </div>
+                            {active ? <Check className="h-4 w-4 text-[rgb(var(--orb-accent-rgb))]" /> : null}
+                          </button>
+                          {p.id !== 'silent' ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Temporarily switch preset, play preview, restore.
+                                const prev = getSoundPreset();
+                                setSoundPreset(p.id);
+                                playSound('receive');
+                                if (prev !== p.id) setTimeout(() => setSoundPreset(prev), 350);
+                              }}
+                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--orb-bg-rgb))]/45 text-[rgb(var(--orb-text-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all duration-200 active:scale-95"
+                              aria-label={t('sounds.preview')}
+                              title={t('sounds.preview')}
+                            >
+                              <Play className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
               ) : null}
 
               {screen === 'profile' ? (
