@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue, useTransform, useReducedMotion } from 'framer-motion';
 import { hapticTap } from '../core/haptics.js';
 import { Activity, Bell, Check, ChevronLeft, ClipboardCopy, Cpu, Flower2, Globe2, Layers, Lock, LogOut, MessageSquare, Mic2, Moon, Music2, Palette, Play, PlugZap, RefreshCw, Shield, SlidersHorizontal, Sparkles, Trash2, UserRound, Zap } from 'lucide-react';
 import { useOrbitsWorker } from '../hooks/useOrbitsWorker.js';
@@ -193,21 +193,48 @@ function ProfileStretchyHeader({ user, scrollEl, onClick }) {
   // and fall back to the compact layout when reduce-motion is on.
   const shouldReduce = useReducedMotion();
 
-  // Framer Motion 11 reads `container.current` once at init. Wrapping
-  // the DOM element we got from the parent in a memoised object gives
-  // `useScroll` a stable ref-like object for the element's lifetime.
-  const containerRef = useMemo(() => ({ current: scrollEl || null }), [scrollEl]);
-  const { scrollY } = useScroll({ container: containerRef });
+  // Drive the morph off a raw DOM scroll listener instead of
+  // framer-motion's useScroll. useScroll latches onto the container
+  // internally and — on some iOS PWA builds — never fires for sticky
+  // descendants, which left the banner frozen at its expanded size
+  // while the list scrolled behind it (the "avatar hangs over the
+  // first row" bug). A direct scroll handler + rAF throttle is
+  // straightforward and correct.
+  const scrollMV = useMotionValue(0);
+  useEffect(() => {
+    if (!scrollEl) return;
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      scrollMV.set(scrollEl.scrollTop || 0);
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(read);
+    };
+    // Prime once on attach so the initial MotionValue matches reality
+    // (otherwise we'd flash the expanded banner when the user returns
+    // to Settings mid-scroll).
+    read();
+    scrollEl.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      scrollEl.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [scrollEl, scrollMV]);
 
   // All MotionValues are derived at the top of the component — never
   // inside style={{}} in the JSX tree — so subscriptions don't leak on
-  // every re-render.
-  const headerHeight = useTransform(scrollY, [0, MORPH], [280, 96]);
-  const photoSize = useTransform(scrollY, [0, MORPH], [260, 52]);
-  const photoRadius = useTransform(scrollY, [0, MORPH], ['18px', '50%']);
-  const bannerOpacity = useTransform(scrollY, [0, MORPH * 0.8], [1, 0]);
-  const nameScale = useTransform(scrollY, [0, MORPH], [1, 0.72]);
-  const nameY = useTransform(scrollY, [0, MORPH], [0, -14]);
+  // every re-render. The photo + name + vertical padding have to add up
+  // to no more than headerHeight or overflow-hidden will clip the top
+  // of the avatar (that was the "avatar sticks into Безопасность" bug).
+  //   expanded:  16 (top) + 200 (photo) + 8 + 44 (name) + 12 (bottom) = 280
+  //   collapsed:  8 (top) +  56 (photo) + 8 + 24 (name) = 96
+  const headerHeight = useTransform(scrollMV, [0, MORPH], [280, 96]);
+  const photoSize = useTransform(scrollMV, [0, MORPH], [200, 56]);
+  const photoRadius = useTransform(scrollMV, [0, MORPH], ['22px', '50%']);
+  const bannerOpacity = useTransform(scrollMV, [0, MORPH * 0.8], [1, 0]);
+  const nameScale = useTransform(scrollMV, [0, MORPH], [1, 0.7]);
 
   // Static reduce-motion fallback — medium-compact hero, no scroll binding.
   if (shouldReduce) {
@@ -252,9 +279,14 @@ function ProfileStretchyHeader({ user, scrollEl, onClick }) {
       // sticky top:0 — pins the header so as the list scrolls up the
       // height/scale MotionValues below collapse it into a compact bar
       // that stays in place. Without sticky it just scrolled away.
+      // justify-start (not justify-end) + padding-top gives a stable
+      // top anchor — justify-end was packing content to the bottom of
+      // the shrinking container, so the photo's top spilled out above
+      // the clip boundary. With justify-start the photo starts from
+      // the top and the overall height simply shrinks around it.
       // touch-action: manipulation — removes the 300ms tap delay on
       // old Android WebViews so the tap feels native.
-      className="sticky top-0 z-10 flex w-full flex-col items-center justify-end overflow-hidden text-center"
+      className="sticky top-0 z-10 flex w-full flex-col items-center overflow-hidden bg-[rgb(var(--orb-bg-rgb))] pt-4 text-center"
       style={{ height: headerHeight, touchAction: 'manipulation' }}
     >
       {/* Full-bleed banner tint. Fades as the header collapses so it
@@ -266,7 +298,7 @@ function ProfileStretchyHeader({ user, scrollEl, onClick }) {
       />
 
       <motion.div
-        className="relative mt-3 overflow-hidden ring-2 ring-white/10"
+        className="relative overflow-hidden ring-2 ring-white/10"
         style={{
           width: photoSize,
           height: photoSize,
@@ -291,8 +323,8 @@ function ProfileStretchyHeader({ user, scrollEl, onClick }) {
       </motion.div>
 
       <motion.div
-        className="mt-2 mb-3 px-3"
-        style={{ scale: nameScale, y: nameY, transformOrigin: 'center top' }}
+        className="mt-2 px-3"
+        style={{ scale: nameScale, transformOrigin: 'center top' }}
       >
         <div className="truncate text-lg font-semibold text-[rgb(var(--orb-text-rgb))]">{display}</div>
         {username ? (
