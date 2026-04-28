@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ClipboardCopy, ChevronLeft, Eye, EyeOff, ImagePlus, LogIn, ShieldCheck } from 'lucide-react';
+import { ClipboardCopy, ChevronLeft, Eye, EyeOff, ImagePlus, LogIn, ShieldCheck, FileText } from 'lucide-react';
 import OrbitsLogo from './OrbitsLogo.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getOrCreateIdentity } from '../core/identity.js';
@@ -21,6 +21,7 @@ export default function Onboarding() {
   const [confirm, setConfirm] = useState('');
   const [unlockPassword, setUnlockPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [policyAccepted, setPolicyAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const canClipboard = typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function';
@@ -56,7 +57,7 @@ export default function Onboarding() {
         return;
       }
     }
-    setStep((s) => Math.min(2, s + 1));
+    setStep((s) => Math.min(3, s + 1));
   };
 
   const submit = async () => {
@@ -76,9 +77,14 @@ export default function Onboarding() {
       setError('Пароли не совпадают');
       return;
     }
+    if (!policyAccepted) {
+      setError('Подтвердите согласие с Политикой конфиденциальности');
+      return;
+    }
     const name = vU.value;
     setBusy(true);
     try {
+      try { localStorage.setItem('orbits_policy_accepted_at', String(Date.now())); } catch (_) {}
       await auth.completeOnboarding({ displayName: name, password, confirm, avatarDataUrl });
     } catch (e) {
       setError(String(e?.message || 'Ошибка'));
@@ -184,7 +190,7 @@ export default function Onboarding() {
               <OrbitsLogo showText={false} />
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">ORBITS P2P</div>
-                <div className="mt-0.5 text-xs text-[rgb(var(--orb-muted-rgb))]">Регистрация (3 шага)</div>
+                <div className="mt-0.5 text-xs text-[rgb(var(--orb-muted-rgb))]">Регистрация (4 шага)</div>
               </div>
             </div>
             {step > 0 ? (
@@ -204,7 +210,7 @@ export default function Onboarding() {
           </div>
 
           <div className="mt-4 flex items-center gap-2">
-            {[0, 1, 2].map((i) => (
+            {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
                 className={cx(
@@ -382,10 +388,8 @@ export default function Onboarding() {
                   key="s2"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (!busy) {
-                      hapticTap();
-                      void submit();
-                    }
+                    hapticTap();
+                    void goNext();
                   }}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -436,14 +440,142 @@ export default function Onboarding() {
 
                   <button
                     type="submit"
-                    disabled={busy}
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl orb-gradient px-4 text-sm font-semibold text-white shadow-lg shadow-[rgb(var(--orb-accent-rgb))]/25 transition-all duration-300 ease-in-out active:scale-95"
+                  >
+                    Далее
+                  </button>
+                </motion.form>
+              ) : null}
+
+              {step === 3 ? (
+                <motion.form
+                  key="s3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!busy && policyAccepted) {
+                      hapticTap();
+                      void submit();
+                    }
+                  }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  className="grid gap-3"
+                >
+                  <div className="rounded-3xl bg-[rgb(var(--orb-bg-rgb))]/30 p-4 ring-1 ring-white/[0.08]">
+                    <div className="flex items-start gap-3">
+                      <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/45 ring-1 ring-white/[0.08]">
+                        <FileText className="h-4 w-4 text-[rgb(var(--orb-text-rgb))]" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">Политика конфиденциальности</div>
+                        <div className="mt-0.5 text-xs text-[rgb(var(--orb-muted-rgb))]">Прочтите и подтвердите согласие, чтобы завершить регистрацию.</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 max-h-[40vh] overflow-y-auto rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 p-3 ring-1 ring-white/[0.06] text-[12px] leading-relaxed text-[rgb(var(--orb-text-rgb))]">
+                      <div className="space-y-3">
+                        <section>
+                          <div className="font-semibold">1. Основные понятия</div>
+                          <ul className="mt-1 list-disc space-y-1 pl-4 text-[rgb(var(--orb-muted-rgb))]">
+                            <li><span className="text-[rgb(var(--orb-text-rgb))]">P2P-мессенджер:</span> децентрализованная сеть, где данные передаются напрямую между устройствами пользователей без участия промежуточных серверов Оператора.</li>
+                            <li><span className="text-[rgb(var(--orb-text-rgb))]">Сквозное шифрование (E2EE):</span> метод шифрования, при котором данные расшифровываются только на устройстве конечного пользователя.</li>
+                            <li><span className="text-[rgb(var(--orb-text-rgb))]">Персональные данные:</span> любая информация, относящаяся к прямо или косвенно определённому физическому лицу.</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">2. Сбор и обработка персональных данных</div>
+                          <ul className="mt-1 list-disc space-y-1 pl-4 text-[rgb(var(--orb-muted-rgb))]">
+                            <li><span className="text-[rgb(var(--orb-text-rgb))]">Предоставляемые пользователем:</span> идентификатор учётной записи (например, публичный ключ), никнейм, аватар, контактная информация (если требуется для верификации).</li>
+                            <li><span className="text-[rgb(var(--orb-text-rgb))]">Технические данные для функциональности:</span> IP-адрес (временный), информация об устройстве (модель, ОС), версия приложения.</li>
+                            <li><span className="text-[rgb(var(--orb-text-rgb))]">Важно!</span> Оператор НЕ обрабатывает и НЕ хранит содержание сообщений, файлов, историю звонков, геолокацию и иные метаданные. Вся коммуникация происходит напрямую между пользователями (P2P) и защищена сквозным шифрованием — ключи хранятся только на устройствах пользователей.</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">3. Цели обработки персональных данных</div>
+                          <ul className="mt-1 list-disc space-y-1 pl-4 text-[rgb(var(--orb-muted-rgb))]">
+                            <li>Предоставление функционала мессенджера (доставка сообщений, авторизация).</li>
+                            <li>Обеспечение безопасности и предотвращение мошенничества (анализ технических данных).</li>
+                            <li>Улучшение и развитие Сервиса (сбор анонимной статистики).</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">4. Передача данных третьим лицам</div>
+                          <p className="mt-1 text-[rgb(var(--orb-muted-rgb))]">Оператор не передаёт персональные данные третьим лицам, за исключением случаев, предусмотренных законодательством РФ (по запросу суда или иных уполномоченных органов).</p>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">5. Меры безопасности</div>
+                          <p className="mt-1 text-[rgb(var(--orb-muted-rgb))]">Оператор использует все доступные технические средства для защиты данных от несанкционированного доступа, включая шифрование каналов связи, защиту серверов и регулярное обновление ПО.</p>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">6. Права пользователей</div>
+                          <ul className="mt-1 list-disc space-y-1 pl-4 text-[rgb(var(--orb-muted-rgb))]">
+                            <li>Требовать уточнения, блокировки или уничтожения своих персональных данных.</li>
+                            <li>Отозвать согласие на обработку персональных данных, направив письменное уведомление Оператору.</li>
+                            <li>Получить информацию о своих персональных данных, обратившись к Оператору.</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">7. Ответственность пользователей</div>
+                          <p className="mt-1 text-[rgb(var(--orb-muted-rgb))]">Пользователь несёт полную ответственность за соответствие передаваемого контента (сообщений, файлов) требованиям действующего законодательства РФ.</p>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">8. Отказ от ответственности Оператора</div>
+                          <p className="mt-1 text-[rgb(var(--orb-muted-rgb))]">Оператор НЕ НЕСЁТ ОТВЕТСТВЕННОСТИ:</p>
+                          <ul className="mt-1 list-disc space-y-1 pl-4 text-[rgb(var(--orb-muted-rgb))]">
+                            <li>За любые действия пользователей Сервиса, включая мошеннические, клеветнические или иные противоправные действия.</li>
+                            <li>За сохранность данных на устройстве пользователя и за последствия компрометации его устройства или учётных данных.</li>
+                            <li>За содержание сообщений, файлов и иной информации, передаваемой с помощью Сервиса. Обеспечение конфиденциальности и безопасности переписки на своём устройстве — прямая обязанность пользователя.</li>
+                            <li>За убытки любого рода (включая косвенные), возникшие в результате использования или невозможности использования Сервиса.</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">9. Изменение Политики</div>
+                          <p className="mt-1 text-[rgb(var(--orb-muted-rgb))]">Оператор имеет право вносить изменения в настоящую Политику. Все изменения публикуются в этом разделе. Продолжение использования Сервиса после публикации изменений означает автоматическое согласие пользователя с ними.</p>
+                        </section>
+
+                        <section>
+                          <div className="font-semibold">10. Контактная информация</div>
+                          <p className="mt-1 text-[rgb(var(--orb-muted-rgb))]">По всем вопросам, связанным с Политикой, пользователь может обратиться к Оператору по адресу электронной почты, указанному в разделе поддержки приложения.</p>
+                        </section>
+                      </div>
+                    </div>
+
+                    <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl bg-[rgb(var(--orb-bg-rgb))]/40 p-3 ring-1 ring-white/[0.08]">
+                      <input
+                        type="checkbox"
+                        checked={policyAccepted}
+                        onChange={(e) => {
+                          hapticTap();
+                          setPolicyAccepted(e.target.checked);
+                        }}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[rgb(var(--orb-accent-rgb))]"
+                      />
+                      <span className="text-xs text-[rgb(var(--orb-text-rgb))]">Я прочитал(а) и согласен(а) с Политикой конфиденциальности.</span>
+                    </label>
+                  </div>
+
+                  {error ? <div className="text-xs text-[rgb(var(--orb-danger-rgb))]">{error}</div> : null}
+
+                  <button
+                    type="submit"
+                    disabled={busy || !policyAccepted}
                     className={cx(
                       'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl orb-gradient px-4 text-sm font-semibold text-white shadow-lg shadow-[rgb(var(--orb-accent-rgb))]/25 transition-all duration-300 ease-in-out active:scale-95',
-                      busy ? 'opacity-70' : ''
+                      (busy || !policyAccepted) ? 'opacity-60' : ''
                     )}
                   >
                     <LogIn className="h-4 w-4" />
-                    Завершить
+                    Принять и завершить
                   </button>
                 </motion.form>
               ) : null}
