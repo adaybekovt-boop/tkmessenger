@@ -37,6 +37,7 @@ import VoiceRecorder, { VoiceButton } from '../components/VoiceRecorder.jsx';
 import VoicePlayer from '../components/VoicePlayer.jsx';
 import AttachmentBubble from '../components/AttachmentBubble.jsx';
 import { cx, formatTimestamp as formatTime, formatLastSeen, peerDisplayName, safeJsonParse } from '../utils/common.js';
+import { t, useLang } from '../core/i18n.js';
 
 function Avatar({ profile, fallback, online }) {
   const img = profile?.avatarDataUrl;
@@ -161,7 +162,7 @@ function ConnectBar({ onConnect }) {
       await onConnect(id);
     } catch (e) {
       setValue(id);
-      setErr(e?.message ? String(e.message) : 'Не удалось подключиться');
+      setErr(e?.message ? String(e.message) : t('chats.connect.fail'));
     }
   };
 
@@ -172,7 +173,7 @@ function ConnectBar({ onConnect }) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void submit(); }}
-          placeholder="Введите ID друга"
+          placeholder={t('chats.placeholder.id')}
           className="h-10 flex-1 rounded-full bg-white/[0.06] px-4 text-sm text-[rgb(var(--orb-text-rgb))] placeholder:text-[rgb(var(--orb-muted-rgb))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--orb-accent-rgb))]/30 transition-all duration-200"
         />
         <button
@@ -182,7 +183,7 @@ function ConnectBar({ onConnect }) {
             void submit();
           }}
           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full orb-gradient text-sm font-medium text-white shadow-lg shadow-[rgb(var(--orb-accent-rgb))]/25 transition-all duration-200 active:scale-95 hover:shadow-[rgb(var(--orb-accent-rgb))]/40"
-          aria-label="Добавить ��онтакт"
+          aria-label={t('chats.add.aria')}
         >
           <UserPlus2 className="h-4 w-4 shrink-0" />
         </button>
@@ -454,6 +455,7 @@ function MenuItem({ icon, label, onClick, danger }) {
 }
 
 export default function Chats() {
+  useLang();
   const peer = usePeerContext();
   const peerRef = useRef(peer);
   peerRef.current = peer;
@@ -484,7 +486,7 @@ export default function Chats() {
   const activePeerEntry = activeId ? peer.peers.find((p) => p.id === activeId) : null;
   const headerName = activeId
     ? peerDisplayName({ profile: activeProfile, peer: activePeerEntry, id: activeId })
-    : 'Чаты';
+    : t('chats.title');
   const [activePin, setActivePin] = useState(null);
   const [pinInfoOpen, setPinInfoOpen] = useState(false);
 
@@ -947,7 +949,7 @@ export default function Chats() {
       <div className="px-4 pt-3">
         <div className="flex items-center justify-between gap-2 rounded-2xl bg-gradient-to-r from-[rgb(var(--orb-accent-rgb))]/10 to-[rgb(var(--orb-accent2-rgb))]/10 px-3 py-2.5 ring-1 ring-[rgb(var(--orb-accent-rgb))]/15">
           <div className="min-w-0">
-            <div className="text-[10px] font-medium tracking-wider text-[rgb(var(--orb-accent-rgb))] uppercase">Твой ID</div>
+            <div className="text-[10px] font-medium tracking-wider text-[rgb(var(--orb-accent-rgb))] uppercase">{t('chats.your.id')}</div>
             <div className="mt-0.5 truncate font-mono text-xs text-[rgb(var(--orb-text-rgb))]">{peer.peerId || '…'}</div>
           </div>
           <button
@@ -962,15 +964,15 @@ export default function Chats() {
               }
             }}
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[rgb(var(--orb-accent-rgb))] transition-colors duration-200 hover:bg-[rgb(var(--orb-accent-rgb))]/10 hover:text-[rgb(var(--orb-accent2-rgb))] disabled:opacity-40"
-            aria-label="Копировать ID"
-            title="Копировать ID"
+            aria-label={t('chats.copy.id')}
+            title={t('chats.copy.id')}
           >
             <ClipboardCopy className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
       <div className="px-4 pt-4 pb-2">
-        <div data-orb-section-title className="text-[10px] font-medium tracking-wider text-[rgb(var(--orb-muted-rgb))] uppercase">Контакты</div>
+        <div data-orb-section-title className="text-[10px] font-medium tracking-wider text-[rgb(var(--orb-muted-rgb))] uppercase">{t('chats.contacts')}</div>
       </div>
       <div className="relative flex-1 overflow-hidden px-2 pb-3">
         <div
@@ -978,7 +980,7 @@ export default function Chats() {
           style={{ transform: `translateY(${Math.min(pullY, 60) - 48}px)` }}
         >
           <div className="rounded-xl bg-[rgb(var(--orb-surface-rgb))]/70 px-3 py-1.5 text-[11px] text-[rgb(var(--orb-muted-rgb))]">
-            {refreshing ? 'Обновляем…' : pullY > 55 ? 'Отпустить' : ''}
+            {refreshing ? t('chats.refreshing') : pullY > 55 ? t('chats.release') : ''}
           </div>
         </div>
         <div
@@ -1027,7 +1029,7 @@ export default function Chats() {
             />
           ))
         ) : (
-          <div className="px-4 py-6 text-sm text-[rgb(var(--orb-muted-rgb))]">Контактов нет.<br/>Введи ID друга выше, чтобы начать чат!</div>
+          <div className="px-4 py-6 text-sm text-[rgb(var(--orb-muted-rgb))]">{t('chats.empty')}<br/>{t('chats.empty.hint')}</div>
         )}
         </div>
       </div>
@@ -1045,7 +1047,7 @@ export default function Chats() {
         <section className="orb-page-bg flex min-w-0 flex-1 flex-col bg-[rgb(var(--orb-bg-rgb))] md:hidden">
           <div className="flex items-center gap-3 border-b border-white/[0.06] bg-gradient-to-r from-[rgb(var(--orb-accent-rgb))]/5 to-[rgb(var(--orb-accent2-rgb))]/5 px-4 py-3">
             <MessageSquare className="h-5 w-5 text-[rgb(var(--orb-accent-rgb))]" />
-            <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">Чаты</div>
+            <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">{t('chats.title')}</div>
           </div>
           {Sidebar}
         </section>
@@ -1053,7 +1055,7 @@ export default function Chats() {
         <section className="orb-page-bg hidden min-w-0 flex-1 md:flex items-center justify-center bg-[rgb(var(--orb-bg-rgb))]">
           <div className="flex flex-col items-center gap-3 text-center">
             <MessageSquare className="h-10 w-10 text-[rgb(var(--orb-muted-rgb))]/40" />
-            <p className="text-sm text-[rgb(var(--orb-muted-rgb))]">Выберите чат, чтобы начать переписку</p>
+            <p className="text-sm text-[rgb(var(--orb-muted-rgb))]">{t('chats.empty.placeholder')}</p>
           </div>
         </section>
       </div>

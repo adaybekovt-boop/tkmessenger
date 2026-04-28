@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Blocks, Clock, Gamepad2, Loader2, Spade, Swords, Users, User } from 'lucide-react';
 import { hapticTap } from '../core/haptics.js';
 import { cx } from '../utils/common.js';
+import { t, useLang } from '../core/i18n.js';
 
 // Keep direct refs to the dynamic imports so we can warm them up before the
 // user taps a card. Once a chunk's promise resolves, React's <Suspense> will
@@ -23,12 +24,17 @@ function preloadGame(id) {
   if (fn) { try { void fn(); } catch (_) {} }
 }
 
+// i18n keys are resolved at render time (inside Lobby) so re-renders triggered
+// by language changes pick up the new strings; the icon/gradient/status stay
+// here as static metadata.
 const GAMES = [
   {
     id: 'blockblast',
-    title: 'Block Blast',
-    subtitle: 'Фигуры на поле 8×8 · соло',
-    players: '1 игрок',
+    titleKey: null, // 'Block Blast' is a brand name, not localised
+    titleStatic: 'Block Blast',
+    subtitleKey: 'games.blockblast.subtitle',
+    playersKey: 'games.players.1',
+    soloPlayer: true,
     status: 'ready',
     icon: Blocks,
     // Accent gradient for the card; uses theme tokens so every theme looks
@@ -37,18 +43,20 @@ const GAMES = [
   },
   {
     id: 'blackjack21',
-    title: '21 очко',
-    subtitle: 'Blackjack · соло или с другом',
-    players: '1–2 игрока',
+    titleKey: 'games.blackjack.title',
+    subtitleKey: 'games.blackjack.subtitle',
+    playersKey: 'games.players.1_2',
+    soloPlayer: false,
     status: 'ready',
     icon: Spade,
     gradient: 'from-[rgb(var(--orb-success-rgb))]/25 to-[rgb(var(--orb-accent-rgb))]/10'
   },
   {
     id: 'chess',
-    title: 'Шахматы',
-    subtitle: 'Полные правила · с собеседником',
-    players: '2 игрока',
+    titleKey: 'games.chess.title',
+    subtitleKey: 'games.chess.subtitle',
+    playersKey: 'games.players.2',
+    soloPlayer: false,
     status: 'soon',
     icon: Swords,
     gradient: 'from-[rgb(var(--orb-danger-rgb))]/25 to-[rgb(var(--orb-accent2-rgb))]/10'
@@ -58,6 +66,9 @@ const GAMES = [
 function GameCard({ game, onSelect, index }) {
   const Icon = game.icon;
   const isReady = game.status === 'ready';
+  const title = game.titleStatic ?? t(game.titleKey);
+  const subtitle = t(game.subtitleKey);
+  const playersLabel = t(game.playersKey);
   return (
     <motion.button
       type="button"
@@ -92,18 +103,18 @@ function GameCard({ game, onSelect, index }) {
           <Icon className="h-5 w-5 text-[rgb(var(--orb-accent-rgb))]" strokeWidth={2} />
         </div>
         <div className="flex items-center gap-1.5 rounded-full bg-[rgb(var(--orb-bg-rgb))]/40 px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--orb-muted-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))]">
-          {game.players === '1 игрок' ? <User className="h-3 w-3" /> : <Users className="h-3 w-3" />}
-          {game.players}
+          {game.soloPlayer ? <User className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+          {playersLabel}
         </div>
       </div>
       <div className="mt-3">
-        <div className="text-base font-bold text-[rgb(var(--orb-text-rgb))]">{game.title}</div>
-        <div className="mt-0.5 text-xs text-[rgb(var(--orb-muted-rgb))]">{game.subtitle}</div>
+        <div className="text-base font-bold text-[rgb(var(--orb-text-rgb))]">{title}</div>
+        <div className="mt-0.5 text-xs text-[rgb(var(--orb-muted-rgb))]">{subtitle}</div>
       </div>
       {!isReady ? (
         <div className="mt-3 inline-flex items-center gap-1 self-start rounded-full bg-[rgb(var(--orb-bg-rgb))]/40 px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--orb-muted-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))]">
           <Clock className="h-3 w-3" />
-          Скоро
+          {t('games.soon')}
         </div>
       ) : null}
     </motion.button>
@@ -111,6 +122,7 @@ function GameCard({ game, onSelect, index }) {
 }
 
 function Lobby({ onSelect }) {
+  useLang();
   // Warm both game chunks during the browser's idle time, so even a user
   // who double-taps or has a flaky connection still gets an instant open.
   // Pointerdown on the card is the primary preload path; this is a net.
@@ -136,9 +148,9 @@ function Lobby({ onSelect }) {
           <Gamepad2 className="h-5 w-5 text-[rgb(var(--orb-accent-rgb))]" />
         </div>
         <div>
-          <div className="text-lg font-bold text-[rgb(var(--orb-text-rgb))]">Игры</div>
+          <div className="text-lg font-bold text-[rgb(var(--orb-text-rgb))]">{t('games.title')}</div>
           <div className="text-xs text-[rgb(var(--orb-muted-rgb))]">
-            Мини-игры прямо в мессенджере
+            {t('games.subtitle')}
           </div>
         </div>
       </header>
@@ -150,9 +162,8 @@ function Lobby({ onSelect }) {
       </div>
 
       <div className="mt-6 rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/40 p-3 text-xs leading-relaxed text-[rgb(var(--orb-muted-rgb))] ring-1 ring-[rgb(var(--orb-border-rgb))]">
-        <div className="mb-1 font-semibold text-[rgb(var(--orb-text-rgb))]">Как это работает?</div>
-        Одиночные игры доступны сразу. Для игр на двоих нужно пригласить
-        собеседника — ходы передаются напрямую между вашими устройствами.
+        <div className="mb-1 font-semibold text-[rgb(var(--orb-text-rgb))]">{t('games.how.title')}</div>
+        {t('games.how.body')}
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 // Shared utility functions used across multiple components.
 // Extracted to eliminate duplication (was copy-pasted in 9+ files).
 
+import { t } from '../core/i18n.js';
+
 /** Conditional className joiner — filters falsy values. */
 export function cx(...v) {
   return v.filter(Boolean).join(' ');
@@ -114,13 +116,14 @@ export function peerDisplayName({ profile, peer, id } = {}) {
 
 /** Produce a friendly short label from a peer id (never raw ORBITS-XXXXXX). */
 export function shortPeerLabel(rawId) {
+  const prefix = t('chats.contact.prefix');
   const s = String(rawId || '').trim();
-  if (!s) return 'Контакт';
+  if (!s) return prefix;
   // Keep the last 4 characters — that's what the user actually
   // recognises when cross-checking fingerprints. Drop the
   // ORBITS- prefix entirely.
   const tail = s.replace(/^orbits[-_:]?/i, '').slice(-4).toUpperCase();
-  return tail ? `Контакт •${tail}` : 'Контакт';
+  return tail ? `${prefix} •${tail}` : prefix;
 }
 
 /** Format seconds to mm:ss.t (for voice recorder / call duration). */

@@ -27,6 +27,7 @@ import { PageTransition } from './components/PageTransition.jsx';
 import { usePeerContext } from './context/PeerContext.jsx';
 import { requestPersistentStorage, startStorageMonitor } from './core/storageCheck.js';
 import { cx } from './utils/common.js';
+import { t, useLang } from './core/i18n.js';
 
 function TabButton({ active, icon: Icon, label, onClick }) {
   return (
@@ -134,6 +135,7 @@ function PeerStatusPill() {
 export default function App() {
   const auth = useAuth();
   useVisualViewport();
+  useLang();
   const [tab, setTab] = useState('chats');
   const [swState, setSwState] = useState({ status: 'инициализация', needRefresh: false, offlineReady: false });
   const [reloadNowFn, setReloadNowFn] = useState(() => () => {});
@@ -513,12 +515,12 @@ export default function App() {
         <nav
           className="orb-nav-bar flex h-[64px] items-center gap-1 overflow-hidden border-t border-white/[0.06] bg-[rgb(var(--orb-bg-rgb))]/95 px-6 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl"
           role="navigation"
-          aria-label="Навигация"
+          aria-label={t('nav.aria')}
         >
-          <TabButton active={tab === 'chats'} icon={MessageSquare} label="Чаты" onClick={() => { hapticTap(); setTab('chats'); }} />
-          <TabButton active={tab === 'drop'} icon={Send} label="Drop" onClick={() => { hapticTap(); setTab('drop'); }} />
-          <TabButton active={tab === 'games'} icon={Gamepad2} label="Игры" onClick={() => { hapticTap(); setTab('games'); }} />
-          <TabButton active={tab === 'settings'} icon={Settings2} label="Ещё" onClick={() => { hapticTap(); setTab('settings'); }} />
+          <TabButton active={tab === 'chats'} icon={MessageSquare} label={t('nav.chats')} onClick={() => { hapticTap(); setTab('chats'); }} />
+          <TabButton active={tab === 'drop'} icon={Send} label={t('nav.drop')} onClick={() => { hapticTap(); setTab('drop'); }} />
+          <TabButton active={tab === 'games'} icon={Gamepad2} label={t('nav.games')} onClick={() => { hapticTap(); setTab('games'); }} />
+          <TabButton active={tab === 'settings'} icon={Settings2} label={t('nav.more')} onClick={() => { hapticTap(); setTab('settings'); }} />
         </nav>
       </div>
     </PeerProvider>

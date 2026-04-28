@@ -5,6 +5,7 @@ import { usePeerContext } from '../context/PeerContext.jsx';
 import { hapticTap } from '../core/haptics.js';
 import { cx, formatSize } from '../utils/common.js';
 import { getFileIcon } from '../utils/fileIcon.jsx';
+import { t, useLang } from '../core/i18n.js';
 
 function BucketBadge({ bucket }) {
   const colors = {
@@ -76,6 +77,7 @@ function QualityPicker({ value, onChange }) {
 }
 
 export default function Drop() {
+  useLang();
   const peer = usePeerContext();
   const drop = peer.drop;
   const { state: dropState } = drop;
@@ -198,7 +200,7 @@ export default function Drop() {
           <Send className="h-5 w-5 text-[rgb(var(--orb-accent-rgb))]" />
         </div>
         <div>
-          <h2 className="text-base font-semibold text-[rgb(var(--orb-text-rgb))]">Orbits Drop</h2>
+          <h2 className="text-base font-semibold text-[rgb(var(--orb-text-rgb))]">{t('drop.title')}</h2>
           <p className="text-xs text-[rgb(var(--orb-muted-rgb))]">
             {status === 'beacon' && `${presence.length} устройств рядом`}
             {status === 'requesting' && 'Ожидание подтверждения...'}
@@ -231,10 +233,10 @@ export default function Drop() {
                     <Signal className="h-8 w-8 text-[rgb(var(--orb-muted-rgb))]/40" />
                   )}
                   <p className="text-sm text-[rgb(var(--orb-muted-rgb))]">
-                    {searchTimeout ? 'Устройства не найдены' : 'Поиск устройств с Orbits Drop...'}
+                    {searchTimeout ? t('drop.no_devices') : t('drop.searching')}
                   </p>
                   <p className="text-xs text-[rgb(var(--orb-muted-rgb))]/60">
-                    Попросите получателя тоже открыть вкладку Drop
+                    {t('drop.hint')}
                   </p>
                   {searchTimeout && (
                     <button
@@ -242,7 +244,7 @@ export default function Drop() {
                       onClick={() => { hapticTap(); setSearchTimeout(false); handleRetry(); }}
                       className="rounded-2xl bg-[rgb(var(--orb-accent-rgb))] px-5 py-2 text-xs font-medium text-white transition-all active:scale-95"
                     >
-                      Попробовать снова
+                      {t('drop.retry')}
                     </button>
                   )}
                 </div>
