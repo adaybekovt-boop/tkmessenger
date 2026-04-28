@@ -124,11 +124,12 @@ function readInitial() {
     if (raw && DICT[raw]) return raw;
   } catch (_) {}
   // Fall back to the browser's preferred language, clamped to something we
-  // actually support.
-  const nav = (typeof navigator !== 'undefined' && navigator.language) || 'ru';
+  // actually support. For unsupported languages we default to English so
+  // an international audience gets a readable UI out of the box.
+  const nav = (typeof navigator !== 'undefined' && navigator.language) || 'en';
   const head = String(nav).toLowerCase().split(/[-_]/)[0];
   if (DICT[head]) return head;
-  return 'ru';
+  return 'en';
 }
 
 let currentLang = readInitial();
