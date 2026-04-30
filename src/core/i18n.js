@@ -98,6 +98,8 @@ const DICT = {
 
     'chess.solo':              'Игра на одном устройстве',
     'chess.solo.sub':          'Передавайте устройство по очереди',
+    'chess.vs_ai':             'Игра с компьютером',
+    'chess.vs_ai.sub':         'Вы играете белыми',
     'chess.online':            'Играть с другом',
     'chess.online.sub':        'Пригласить контакт по сети',
     'chess.start':             'Начать партию',
@@ -194,6 +196,8 @@ const DICT = {
 
     'chess.solo':              'Pass-and-play',
     'chess.solo.sub':          'Two players on one device',
+    'chess.vs_ai':             'Play vs computer',
+    'chess.vs_ai.sub':         'You play as White',
     'chess.online':            'Play with a friend',
     'chess.online.sub':        'Invite a contact over the network',
     'chess.start':             'Start game',
@@ -290,6 +294,8 @@ const DICT = {
 
     'chess.solo':              'Бір құрылғыда ойнау',
     'chess.solo.sub':          'Құрылғыны кезекпен беріңіздер',
+    'chess.vs_ai':             'Компьютермен ойнау',
+    'chess.vs_ai.sub':         'Сіз ақпен ойнайсыз',
     'chess.online':            'Доспен ойнау',
     'chess.online.sub':        'Контактіні желі арқылы шақыру',
     'chess.start':             'Партияны бастау',

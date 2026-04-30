@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Flag, RotateCcw, Users as UsersIcon, User, Trophy } from 'lucide-react';
+import { ChevronLeft, Flag, RotateCcw, Users as UsersIcon, User, Trophy, Cpu, Loader2 } from 'lucide-react';
 import { hapticTap } from '../../core/haptics.js';
 import { cx } from '../../utils/common.js';
 import { t, useLang } from '../../core/i18n.js';
@@ -15,12 +15,35 @@ import {
   colorOf,
   typeOf,
 } from './engine.js';
+import { pickAiMove } from './ai.js';
 
-// Unicode glyphs — keeps the bundle tiny vs shipping piece SVGs. The same
-// glyphs render fine on every platform (system fonts ship outlines).
+// Unicode glyphs — keeps the bundle tiny vs shipping piece SVGs. We use the
+// FILLED (Unicode "black") set for both colours and split them by render
+// colour. The outlined "white-king" U+2654 family is too thin on most
+// system fonts and disappears on light squares; using the filled glyph for
+// both sides plus a hard outline gives a Lichess-style readable board.
 const GLYPHS = {
-  wK: '♔', wQ: '♕', wR: '♖', wB: '♗', wN: '♘', wP: '♙',
+  wK: '♚', wQ: '♛', wR: '♜', wB: '♝', wN: '♞', wP: '♟',
   bK: '♚', bQ: '♛', bR: '♜', bB: '♝', bN: '♞', bP: '♟',
+};
+
+// Hard 8-direction text-shadow stroke around each glyph. Shipped as inline
+// styles because Tailwind has no native equivalent for layered text-shadow.
+// White pieces get a black halo, black pieces a white one — both pop on
+// either square colour.
+const WHITE_PIECE_STYLE = {
+  color: '#fafafa',
+  textShadow:
+    '-1.5px -1.5px 0 #111, 0 -1.5px 0 #111, 1.5px -1.5px 0 #111,'
+    + '-1.5px 0 0 #111, 1.5px 0 0 #111,'
+    + '-1.5px 1.5px 0 #111, 0 1.5px 0 #111, 1.5px 1.5px 0 #111',
+};
+const BLACK_PIECE_STYLE = {
+  color: '#0a0a0a',
+  textShadow:
+    '-1.5px -1.5px 0 #f5f5f5, 0 -1.5px 0 #f5f5f5, 1.5px -1.5px 0 #f5f5f5,'
+    + '-1.5px 0 0 #f5f5f5, 1.5px 0 0 #f5f5f5,'
+    + '-1.5px 1.5px 0 #f5f5f5, 0 1.5px 0 #f5f5f5, 1.5px 1.5px 0 #f5f5f5',
 };
 
 // Reducer keeps the game state immutable so the board re-render is just a
@@ -104,7 +127,9 @@ function CapturedRow({ board, color }) {
   }
   return (
     <div className="flex h-6 flex-wrap items-center gap-0.5 text-base leading-none">
-      {captured.map((p, i) => <span key={i}>{GLYPHS[p]}</span>)}
+      {captured.map((p, i) => (
+        <span key={i} style={colorOf(p) === 'w' ? WHITE_PIECE_STYLE : BLACK_PIECE_STYLE}>{GLYPHS[p]}</span>
+      ))}
     </div>
   );
 }
@@ -167,7 +192,7 @@ function Board({ game, dispatch, viewColor = 'w', locked }) {
   const lastMove = state.lastMove;
 
   return (
-    <div className="aspect-square w-full max-w-[440px] rounded-2xl bg-[rgb(var(--orb-surface-rgb))] p-1.5 ring-1 ring-[rgb(var(--orb-border-rgb))] shadow-lg">
+    <div className="aspect-square w-full max-w-[520px] rounded-2xl bg-[rgb(var(--orb-surface-rgb))] p-1.5 ring-1 ring-[rgb(var(--orb-border-rgb))] shadow-lg">
       <div className="grid h-full w-full grid-cols-8 grid-rows-8 overflow-hidden rounded-xl">
         {rows.flat().map((i) => {
           const isDark = (fileOf(i) + rankOf(i)) % 2 === 0;
@@ -184,21 +209,22 @@ function Board({ game, dispatch, viewColor = 'w', locked }) {
               type="button"
               onClick={() => onSquare(i)}
               className={cx(
-                'relative flex select-none items-center justify-center text-[clamp(22px,7vw,40px)] leading-none transition-colors',
-                isDark ? 'bg-[#769656]' : 'bg-[#eeeed2]',
+                'relative flex select-none items-center justify-center font-bold leading-none transition-colors',
+                'text-[clamp(36px,11vw,60px)]',
+                isDark ? 'bg-[#779556]' : 'bg-[#ebecd0]',
                 isSelected && 'ring-2 ring-inset ring-[rgb(var(--orb-accent-rgb))]',
-                (isLastFrom || isLastTo) && !isSelected && 'ring-2 ring-inset ring-yellow-400/40',
+                (isLastFrom || isLastTo) && !isSelected && 'ring-2 ring-inset ring-yellow-400/50',
               )}
               aria-label={squareName(i) + (piece ? ' ' + piece : '')}
             >
               {fileLabel != null ? (
-                <span className={cx('absolute left-0.5 top-0 text-[9px] font-semibold', isDark ? 'text-[#eeeed2]' : 'text-[#769656]')}>{fileLabel}</span>
+                <span className={cx('absolute left-0.5 top-0 text-[10px] font-semibold', isDark ? 'text-[#ebecd0]' : 'text-[#779556]')}>{fileLabel}</span>
               ) : null}
               {rankLabel != null ? (
-                <span className={cx('absolute bottom-0 right-0.5 text-[9px] font-semibold', isDark ? 'text-[#eeeed2]' : 'text-[#769656]')}>{rankLabel}</span>
+                <span className={cx('absolute bottom-0 right-0.5 text-[10px] font-semibold', isDark ? 'text-[#ebecd0]' : 'text-[#779556]')}>{rankLabel}</span>
               ) : null}
               {piece ? (
-                <span className={cx('drop-shadow-sm', colorOf(piece) === 'w' ? 'text-white' : 'text-black')}>
+                <span style={colorOf(piece) === 'w' ? WHITE_PIECE_STYLE : BLACK_PIECE_STYLE}>
                   {GLYPHS[piece]}
                 </span>
               ) : null}
@@ -206,8 +232,8 @@ function Board({ game, dispatch, viewColor = 'w', locked }) {
                 <span className={cx(
                   'pointer-events-none absolute',
                   piece
-                    ? 'inset-1 rounded-full ring-4 ring-[rgb(var(--orb-accent-rgb))]/55'
-                    : 'h-1/4 w-1/4 rounded-full bg-[rgb(var(--orb-accent-rgb))]/45'
+                    ? 'inset-1 rounded-full ring-[6px] ring-[rgb(var(--orb-accent-rgb))]/55'
+                    : 'h-[30%] w-[30%] rounded-full bg-[rgb(var(--orb-accent-rgb))]/55'
                 )} />
               ) : null}
             </button>
@@ -231,14 +257,12 @@ function PromotionPicker({ promotion, onPick, onCancel }) {
               key={p}
               type="button"
               onClick={() => onPick(p)}
-              className={cx(
-                'grid h-14 w-14 place-items-center rounded-xl text-[36px] leading-none ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all active:scale-95',
-                'bg-[rgb(var(--orb-bg-rgb))]/60 hover:bg-[rgb(var(--orb-accent-rgb))]/15',
-                color === 'w' ? 'text-white' : 'text-black'
-              )}
+              className="grid h-16 w-16 place-items-center rounded-xl text-[44px] font-bold leading-none ring-1 ring-[rgb(var(--orb-border-rgb))] bg-[rgb(var(--orb-bg-rgb))]/60 hover:bg-[rgb(var(--orb-accent-rgb))]/15 transition-all active:scale-95"
               aria-label={p}
             >
-              {GLYPHS[color + p]}
+              <span style={color === 'w' ? WHITE_PIECE_STYLE : BLACK_PIECE_STYLE}>
+                {GLYPHS[color + p]}
+              </span>
             </button>
           ))}
         </div>
@@ -296,12 +320,28 @@ function GameView({ onExit, mode = 'solo' }) {
   useLang();
   const [game, dispatch] = useReducer(reducer, undefined, freshGame);
   const viewColor = 'w';
+  // In AI mode the human always plays White; the AI thinks while it's Black's
+  // turn. A small thinking delay (250ms) keeps the move from feeling
+  // instant — which previously made testers second-guess whether their move
+  // had even registered.
+  const aiTurn = mode === 'ai' && game.state.turn === 'b' && !game.ended;
+  useEffect(() => {
+    if (!aiTurn) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      const move = pickAiMove(game.state, 3);
+      if (move) dispatch({ type: 'apply', move });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [aiTurn, game.state]);
 
   const handleResign = () => {
     if (game.ended) return;
     if (typeof window !== 'undefined' && !window.confirm(t('chess.resign.confirm'))) return;
     hapticTap();
-    dispatch({ type: 'resign' });
+    // In AI mode the human is white, so resigning hands the win to black.
+    dispatch({ type: 'resign', by: mode === 'ai' ? 'w' : game.state.turn });
   };
 
   const handleNewGame = () => { hapticTap(); dispatch({ type: 'reset' }); };
@@ -340,7 +380,13 @@ function GameView({ onExit, mode = 'solo' }) {
       </div>
 
       <div className="relative flex flex-1 items-center justify-center">
-        <Board game={game} dispatch={dispatch} viewColor={viewColor} locked={!!game.ended} />
+        <Board game={game} dispatch={dispatch} viewColor={viewColor} locked={!!game.ended || aiTurn} />
+        {aiTurn ? (
+          <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {t('chess.turn.black')}
+          </div>
+        ) : null}
         <PromotionPicker
           promotion={game.promotion}
           onPick={(p) => {
@@ -382,8 +428,22 @@ function ModePicker({ onPick, onExit }) {
 
       <button
         type="button"
-        onClick={() => { hapticTap(); onPick('solo'); }}
+        onClick={() => { hapticTap(); onPick('ai'); }}
         className="flex w-full items-center gap-3 rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/60 p-4 text-left ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all active:scale-[0.99] hover:ring-[rgb(var(--orb-accent-rgb))]/40"
+      >
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[rgb(var(--orb-accent-rgb))]/15 ring-1 ring-[rgb(var(--orb-accent-rgb))]/25">
+          <Cpu className="h-5 w-5 text-[rgb(var(--orb-accent-rgb))]" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[rgb(var(--orb-text-rgb))]">{t('chess.vs_ai')}</div>
+          <div className="mt-0.5 text-xs text-[rgb(var(--orb-muted-rgb))]">{t('chess.vs_ai.sub')}</div>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => { hapticTap(); onPick('solo'); }}
+        className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-[rgb(var(--orb-surface-rgb))]/60 p-4 text-left ring-1 ring-[rgb(var(--orb-border-rgb))] transition-all active:scale-[0.99] hover:ring-[rgb(var(--orb-accent-rgb))]/40"
       >
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[rgb(var(--orb-accent-rgb))]/15 ring-1 ring-[rgb(var(--orb-accent-rgb))]/25">
           <UsersIcon className="h-5 w-5 text-[rgb(var(--orb-accent-rgb))]" />
@@ -394,8 +454,8 @@ function ModePicker({ onPick, onExit }) {
         </div>
       </button>
 
-      {/* Online (P2P) mode is wired to the existing peer.sendGame transport.
-          Hidden behind a separate button so the demo path (solo) is one tap. */}
+      {/* Online (P2P) mode — uses the existing peer.sendGame transport.
+          Disabled until the invite/move handler is wired through. */}
       <button
         type="button"
         disabled
