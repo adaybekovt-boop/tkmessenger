@@ -10,13 +10,16 @@ import { t, useLang } from '../core/i18n.js';
 // render the child synchronously (no fallback flash) on first render.
 const loadBlockBlast = () => import('../games/blockblast/BlockBlast.jsx');
 const loadBlackjack21 = () => import('../games/blackjack21/Blackjack21.jsx');
+const loadChess = () => import('../games/chess/Chess.jsx');
 const BlockBlast = lazy(loadBlockBlast);
 const Blackjack21 = lazy(loadBlackjack21);
+const Chess = lazy(loadChess);
 
 // Map ids to their preload function. Unknown ids are a no-op.
 const PRELOADERS = {
   blockblast: loadBlockBlast,
   blackjack21: loadBlackjack21,
+  chess: loadChess,
 };
 
 function preloadGame(id) {
@@ -55,9 +58,9 @@ const GAMES = [
     id: 'chess',
     titleKey: 'games.chess.title',
     subtitleKey: 'games.chess.subtitle',
-    playersKey: 'games.players.2',
+    playersKey: 'games.players.1_2',
     soloPlayer: false,
-    status: 'soon',
+    status: 'ready',
     icon: Swords,
     gradient: 'from-[rgb(var(--orb-danger-rgb))]/25 to-[rgb(var(--orb-accent2-rgb))]/10'
   }
@@ -200,6 +203,14 @@ export default function Games() {
           </div>
         }>
           <Blackjack21 onExit={backToLobby} />
+        </Suspense>
+      ) : screen === 'chess' ? (
+        <Suspense fallback={
+          <div className="flex h-full w-full items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--orb-muted-rgb))]" />
+          </div>
+        }>
+          <Chess onExit={backToLobby} />
         </Suspense>
       ) : null}
     </div>
