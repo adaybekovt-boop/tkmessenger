@@ -1,0 +1,258 @@
+// Port of the `locked` branch of `src/components/Onboarding.jsx` — the
+// password-entry screen shown when a profile exists but the vault is
+// locked. Two actions: [AuthNotifier.unlock] for the happy path, and
+// [AuthNotifier.wipeLocal] behind an AlertDialog for "забыл пароль".
+//
+// Visually mirrors the onboarding wizard: same glass card, same header,
+// same big-button shape, so the locked → unlocked → onboarded flow
+// reads as a single cohesive surface.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/haptics.dart';
+import '../../state/auth_notifier.dart';
+import '../../themes/orbits_tokens.dart';
+
+class UnlockPage extends ConsumerStatefulWidget {
+  const UnlockPage({super.key});
+
+  @override
+  ConsumerState<UnlockPage> createState() => _UnlockPageState();
+}
+
+class _UnlockPageState extends ConsumerState<UnlockPage> {
+  final _passwordCtrl = TextEditingController();
+  bool _showPass = false;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _unlock() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(authNotifierProvider.notifier)
+          .unlock(password: _passwordCtrl.text);
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Ошибка: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmWipe() async {
+    hapticTap();
+    final tokens = OrbitsTokens.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Сбросить профиль?'),
+        content: const Text(
+          'Это удалит имя, пароль и криптоключи на этом устройстве. '
+          'Отменить действие будет нельзя.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: tokens.danger),
+            child: const Text('Сбросить'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(authNotifierProvider.notifier).wipeLocal();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(authNotifierProvider);
+    final displayName = state is AuthLocked ? state.profile.displayName : '';
+    final tokens = OrbitsTokens.of(context);
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: tokens.accentAlpha(0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(Icons.lock_outline,
+                            size: 20, color: tokens.accent),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ORBITS P2P',
+                              style: TextStyle(
+                                fontFamily: tokens.fontHeading,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: tokens.text,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            Text(
+                              displayName.isEmpty
+                                  ? 'Введите пароль'
+                                  : 'Открыть профиль «$displayName»',
+                              style: TextStyle(
+                                fontFamily: tokens.fontMono,
+                                fontSize: 11,
+                                color: tokens.muted,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  // Glass card with password field
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Color.lerp(tokens.bg, tokens.surface, 0.5),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: tokens.border),
+                      boxShadow: tokens.shadowCard,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _passwordCtrl,
+                          obscureText: !_showPass,
+                          autofocus: true,
+                          style: TextStyle(
+                            fontFamily: tokens.fontBody,
+                            fontSize: 15,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Пароль',
+                            hintText: '••••••••',
+                            filled: true,
+                            fillColor: tokens.bg.withValues(alpha: 0.45),
+                            suffixIcon: IconButton(
+                              tooltip: _showPass ? 'Скрыть' : 'Показать',
+                              icon: Icon(_showPass
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined),
+                              color: tokens.muted,
+                              onPressed: () {
+                                hapticTap();
+                                setState(() => _showPass = !_showPass);
+                              },
+                            ),
+                          ),
+                          onSubmitted: (_) => _unlock(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: tokens.dangerAlpha(0.12),
+                        borderRadius:
+                            BorderRadius.circular(tokens.radiusButton),
+                        border: Border.all(color: tokens.dangerAlpha(0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline,
+                              color: tokens.danger, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _error!,
+                              style: TextStyle(
+                                color: tokens.danger,
+                                fontSize: 13,
+                                fontFamily: tokens.fontBody,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _unlock,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.login, size: 18),
+                    label: Text(_busy ? 'Проверяем…' : 'Войти'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(tokens.radiusCard),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _busy ? null : _confirmWipe,
+                    style: TextButton.styleFrom(
+                      foregroundColor: tokens.danger,
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                    child: const Text('Сбросить профиль'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
