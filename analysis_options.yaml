@@ -1,0 +1,61 @@
+# Analyzer + linter configuration.
+#
+# Inherits from the recommended `flutter_lints` ruleset (which already
+# bundles `prefer_const_constructors` and friends), plus an explicit list
+# of *performance-relevant* rules I want enforced beyond the baseline.
+# Keeping them spelled out makes it obvious to future contributors why a
+# given pattern (e.g. `Container` with no decoration) gets flagged in
+# review, and it's a single source of truth if we ever swap out the
+# included ruleset.
+#
+# Don't disable a rule globally without a comment explaining why.
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Promote a few forward-compatibility info-level warnings to actual
+    # warnings so they surface in CI output.
+    deprecated_member_use_from_same_package: warning
+  # NOTE: we *don't* enable strict-casts / strict-inference yet — they
+  # would cascade through Drift codegen + cryptography_flutter shape-
+  # checks and need their own cleanup pass. Tracked for post-launch.
+
+linter:
+  rules:
+    # ── Performance ────────────────────────────────────────────────────
+    # `const` everywhere we can — every const widget is a free shortcut
+    # for the rebuild diff (identical(old, new) → skip the subtree).
+    prefer_const_constructors: true
+    prefer_const_constructors_in_immutables: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+
+    # Empty `Container()` has measurable cost (creates a RenderObject for
+    # nothing). Use `SizedBox` for spacing, drop it entirely when you can.
+    avoid_unnecessary_containers: true
+
+    # `Color.withValues(alpha: …)` is GPU-accelerated; the old
+    # `Color.withOpacity` route through the deprecated alpha encoding.
+    use_full_hex_values_for_flutter_colors: true
+
+    # Catch leaking subscriptions / controllers — the JS leaks doc cites
+    # this as the #1 OOM source in long-running chats.
+    cancel_subscriptions: true
+    close_sinks: true
+
+    # `BuildContext` after async gaps is a foot-gun (looks fine, crashes
+    # when the user navigates away mid-await). Already on by default in
+    # flutter_lints; reasserting for clarity.
+    use_build_context_synchronously: true
+
+    # Null-aware in conditions where the value is already non-nullable
+    # signals stale code that hasn't been updated post-NNBD migration.
+    unnecessary_null_checks: true
+
+    # NOTE: `discarded_futures` and `unawaited_futures` would be ideal
+    # to enforce, but the existing codebase (peerjs_client, calls, voice
+    # recorder, onboarding) has ~50 fire-and-forget call sites that are
+    # intentionally non-awaited. Promoting these to lints today drowns
+    # the CI signal in pre-existing noise. Tracked as a separate cleanup
+    # pass — after the audit, re-enable both rules and they'll be tight.

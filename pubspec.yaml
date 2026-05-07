@@ -1,0 +1,100 @@
+name: orbits_flutter
+description: Orbits P2P Messenger — Flutter port. Mirrors the React/Vite project in git_push/.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  # Dart 3.6+ / Flutter 3.27+ for `Color.withValues(alpha:)` and related
+  # modern Material APIs used by `lib/games/blockblast/block_blast_page.dart`.
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Crypto (porting src/core/crypto.js, doubleRatchet.js, x3dh.js, identityKey.js)
+  cryptography: ^2.7.0           # AES-GCM, PBKDF2, HKDF, ECDH P-256, ECDSA P-256
+  cryptography_flutter: ^2.3.2   # Native-backed implementations (Secure Enclave on iOS)
+  pointycastle: ^3.9.1           # scrypt (the cryptography package doesn't ship it)
+  convert: ^3.1.1                # hex / base64 helpers
+
+  # P2P (porting src/peer/*.js — PeerJS over WebRTC)
+  flutter_webrtc: ^0.11.7        # Raw WebRTC (equivalent of browser RTCPeerConnection)
+  web_socket_channel: ^3.0.1     # Signaling transport to PeerJS server
+
+  # Storage (porting src/core/db.js, idbStore.js) — Drift over SQLite.
+  # Drift gives typed queries + built-in isolate support, and sqlite3_flutter_libs
+  # ships the native sqlite3 we need on Android/iOS/desktop.
+  drift: ^2.20.0
+  drift_flutter: ^0.2.2          # path_provider + sqlite3_flutter_libs wiring
+  sqlite3_flutter_libs: ^0.5.24  # bundled sqlite3 binary for mobile/desktop
+  path_provider: ^2.1.4
+
+  # Vault KEK guardian — OS-level keychain / keystore with biometric gating.
+  # v10+ introduces the enforceBiometrics / biometryCurrentSet flags we rely on.
+  flutter_secure_storage: ^10.0.0-beta.4
+
+  # Plain key/value prefs (porting src/peer/multiTabLock.js and friends). On
+  # web this layers on localStorage; on Android/iOS/desktop on native backed
+  # files. Used for the multi-tab lock and any non-secret "was the user here
+  # before" flags that don't belong in the encrypted Drift DB.
+  shared_preferences: ^2.3.3
+
+  # State management (Phase 11 UI shell onwards). Mirrors the React app's
+  # Context + hooks layering (see research/09_State management.md). We start
+  # on plain Provider / StateNotifierProvider APIs; @riverpod codegen can be
+  # layered on later without breaking existing providers.
+  flutter_riverpod: ^2.5.1
+
+  # Day 4 — voice messages + file attachments (porting src/components/
+  # VoiceRecorder.jsx, VoicePlayer.jsx, AttachmentBubble.jsx and the
+  # paperclip picker in Chats.jsx).
+  #
+  # `record` handles audio capture (Opus/WebM on Android & web, AAC/m4a on
+  # iOS) and exposes an amplitude stream so we can draw the live waveform
+  # identical to the JS rAF sampler. `just_audio` plays the inbound blob —
+  # it can swap sources on the fly which we need for "load bytes from
+  # Drift, hand to a Uri-less source". `file_picker` is the native file
+  # sheet (single-file; matches the JS `<input type="file">`). `mime`
+  # infers content-type from filename when the picker doesn't give one
+  # (common on Android for odd extensions). `image` resizes full-res
+  # photos down to the ≤48 KiB JPEG thumbnail the JS receiver expects in
+  # `attachment.thumb`.
+  record: ^5.1.2
+  just_audio: ^0.9.42
+  file_picker: ^8.1.4
+  mime: ^2.0.0
+  image: ^4.3.0
+
+  # Day-5 / launch-blocker packages — fonts, QR display, QR scanning.
+  #
+  # `google_fonts` downloads the brand fonts (Manrope, Cormorant Garamond,
+  # Geist, Instrument Serif, Noto Serif, JetBrains Mono) at runtime instead
+  # of bundling them — keeps the install size reasonable while letting each
+  # theme spec its own family. First-paint uses the system fallback for
+  # ~150 ms while the network request resolves; subsequent launches read
+  # from disk cache.
+  google_fonts: ^6.2.1
+
+  # `qr_flutter` renders the user's peerId as a scannable QR code on the
+  # "Show my QR" screen. Pure-Dart, no native deps.
+  qr_flutter: ^4.1.0
+
+  # `mobile_scanner` is the live camera-feed QR reader. Modern replacement
+  # for the deprecated `qr_code_scanner` (which has unmaintained native
+  # deps and breaks under Android 16 KB page alignment). v6 ships with
+  # 16-KB-aligned native libs, which we need for Play Store submission.
+  mobile_scanner: ^6.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+  # Drift codegen (tables.dart → tables.g.dart, database.dart → database.g.dart)
+  drift_dev: ^2.20.0
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true

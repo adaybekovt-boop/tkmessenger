@@ -1,0 +1,65 @@
+{
+  "hkdf": [
+    {
+      "ikm": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "salt": "000102030405060708090a0b0c",
+      "info_utf8": "f0f1f2f3f4f5f6f7f8f9",
+      "out_len": 42,
+      "output": "e030b6755e42e40d698bc2bbad71cae4a5704f02d0bcc9b405eab29c5a328e429bfa4301035e09c51ba8"
+    },
+    {
+      "ikm": "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "salt": "0000000000000000000000000000000000000000000000000000000000000000",
+      "info_utf8": "orbits-x3dh-v1",
+      "out_len": 32,
+      "output": "0b3d2ba43e3363cb127f5a5cfffca8a7a1b9e92c6b75daa5c9999efa1ff777b6"
+    }
+  ],
+  "aes_gcm": [
+    {
+      "key": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "iv": "0102030405060708090a0b0c",
+      "plaintext_utf8": "hello from orbits round-trip",
+      "plaintext_hex": "68656c6c6f2066726f6d206f726269747320726f756e642d74726970",
+      "ciphertext": "5c9e9ccaa36cc3e2b6189ce815adc6cdff3fa882fdbbb58bec1be663",
+      "tag": "9564c395ae2ad71bf2da97336055b9bf",
+      "ciphertext_with_tag": "5c9e9ccaa36cc3e2b6189ce815adc6cdff3fa882fdbbb58bec1be6639564c395ae2ad71bf2da97336055b9bf"
+    },
+    {
+      "key": "0000000000000000000000000000000000000000000000000000000000000000",
+      "iv": "000000000000000000000000",
+      "plaintext_utf8": "",
+      "plaintext_hex": "",
+      "ciphertext": "",
+      "tag": "530f8afbc74536b9a963b4f1c4cb738b",
+      "ciphertext_with_tag": "530f8afbc74536b9a963b4f1c4cb738b"
+    }
+  ],
+  "scrypt": [
+    {
+      "password_utf8": "alice:hunter2:ORBITS_P2P",
+      "salt": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+      "N": 16384,
+      "r": 8,
+      "p": 1,
+      "dk_len": 32,
+      "output": "4e9327558d559cf65dc775a54998f14d16366b0912a07192e160e1b791144ece"
+    }
+  ],
+  "x3dh_derive": [
+    {
+      "dh1": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "dh2": "2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
+      "dh3": "4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60",
+      "dh4": "6162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80",
+      "sk": "44ed95e724eeca9e627eecdf7cdd5822d11734e99342659ed0e904e17f9d3ec8"
+    },
+    {
+      "dh1": "f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0",
+      "dh2": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+      "dh3": "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",
+      "dh4": null,
+      "sk": "e6b190847db163173ba07e4b2ce88c794253ca278fd687c8044b0c788a2b1462"
+    }
+  ]
+}
