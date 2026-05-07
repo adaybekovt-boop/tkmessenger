@@ -7,16 +7,19 @@
 // EXIF and re-encoded as JPEG.
 //
 // Flutter port uses `package:image` for decode → resize-cover → encode.
-// The decode/resize/encode pipeline runs inside `Isolate.run` on native
-// so the auth-onboarding spinner doesn't freeze the UI thread while a
-// 12-MP phone selfie is being downsized. On web `Isolate.run` runs on
-// the main thread (no real isolation in Dart-to-JS) which is identical
-// to a synchronous call — fine, the same operation happens.
+// The decode/resize/encode pipeline runs inside `compute()` so the
+// auth-onboarding spinner doesn't freeze the UI thread while a 12-MP
+// phone selfie is being downsized. `compute` spawns a worker isolate on
+// native targets and falls through to a synchronous main-thread call on
+// web — there are no real isolates in dart2js / dart2wasm, but the same
+// operation still runs and the API surface stays single. (Direct
+// `Isolate.run` would fail to compile on web because `dart:isolate` is
+// VM-only.)
 
 import 'dart:convert';
-import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:image/image.dart' as img;
 
 const int defaultMaxBytes = 3 * 1024 * 1024; // 3 MB cap — same as JS.
@@ -49,12 +52,13 @@ Future<Uint8List> resizeAvatarBytes(
   if (mimeType != null && !mimeType.toLowerCase().startsWith('image/')) {
     throw const AvatarError('Нужна картинка');
   }
-  // Bundle the work into a single closure so we can run it in an isolate
-  // — `image` ops are CPU-bound and 4-8 MP inputs visibly stall the UI
-  // when run on the main thread.
+  // Bundle the work into a single closure-free entry so it can ride into
+  // `compute` — `image` ops are CPU-bound and 4-8 MP inputs visibly stall
+  // the UI when run on the main thread.
   try {
-    return await Isolate.run(
-      () => _resizeAvatarSync(src, size: size, quality: quality),
+    return await compute(
+      _resizeAvatarComputeEntry,
+      (src: src, size: size, quality: quality),
     );
   } on AvatarError {
     rethrow;
@@ -83,8 +87,20 @@ Future<String?> fileToAvatarDataUrl(
   return 'data:image/jpeg;base64,${base64Encode(resized)}';
 }
 
+/// Single-argument record shape so `compute` can ship the work to a
+/// worker without dragging closure context. `compute` requires a top-
+/// level function whose only parameter is the message — records keep
+/// the call site readable while satisfying that contract.
+typedef _ResizeArgs = ({Uint8List src, int size, int quality});
+
+/// Top-level entry point for `compute`. Forwards into the file-scope
+/// sync implementation. Has to be top-level (not a method, not a
+/// closure) so the runtime can serialise it into the isolate.
+Uint8List _resizeAvatarComputeEntry(_ResizeArgs args) =>
+    _resizeAvatarSync(args.src, size: args.size, quality: args.quality);
+
 /// CPU-bound part of the avatar pipeline. Pure top-level function so it
-/// can ride into `Isolate.run` without dragging in any closure context.
+/// can ride into `compute` without dragging in any closure context.
 Uint8List _resizeAvatarSync(
   Uint8List src, {
   required int size,
