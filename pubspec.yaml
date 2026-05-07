@@ -87,6 +87,26 @@ dependencies:
   # 16-KB-aligned native libs, which we need for Play Store submission.
   mobile_scanner: ^6.0.2
 
+# Force-pin packages that have known-broken releases under Dart 3.8 /
+# Flutter 3.32. These overrides shadow whatever pub picks for the
+# `^` ranges above.
+#
+#   cryptography_flutter — 2.3.4 ships a busted `_internal.dart` that
+#   imports `@internal` from `package:meta` without aliasing it, so the
+#   compiler hits "Undefined name 'internal'" on every build. 2.3.2 is
+#   the last release where the file is consistent. The build bug is
+#   tracked upstream; until a fixed release lands, an exact pin keeps
+#   us off the broken version.
+#
+#   record_linux — 0.7.2 is missing `RecordMethodChannelPlatformInterface`
+#   members (e.g. `hasPermission` lost a named arg). 0.7.0 still
+#   matches the published `record_platform_interface` shape and isn't
+#   pulled in by Android / Windows builds anyway, but pin it so anyone
+#   running on Linux doesn't trip over it.
+dependency_overrides:
+  cryptography_flutter: 2.3.2
+  record_linux: 0.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
