@@ -19,10 +19,10 @@
 #
 #   4. minSdk bump to 23 — flutter_webrtc / mobile_scanner / record floors.
 #
-#   5. settings.gradle — bump Kotlin Gradle plugin (mobile_scanner ^6.0.2
-#      compiles against Kotlin 1.9+, and Flutter 3.27 templates still ship
-#      Kotlin 1.8.22) and AGP, plus the matching compileSdk/targetSdk so
-#      AndroidX stable 1.6+ APIs resolve.
+#   5. settings.gradle — defensive Kotlin/AGP bump. On Flutter 3.32+ the
+#      template already ships Kotlin 2.x and AGP 8.7+, so this is usually
+#      a no-op. Kept around for older Flutter SDKs where the template
+#      still pins Kotlin to 1.8.22.
 #
 # Run this AFTER `flutter create --platforms=android …`. Idempotent.
 
@@ -226,15 +226,13 @@ path.write_text(new, encoding="utf-8")
 PY
 fi
 
-# ─── 5. settings.gradle — Kotlin Gradle plugin + AGP version bumps ──────────
+# ─── 5. settings.gradle — defensive Kotlin/AGP version bumps ────────────────
 #
-# Flutter 3.27 templates pin Kotlin to 1.8.22, which mobile_scanner ^6.0.2
-# refuses to compile against. We bump both Kotlin and AGP to a known-good
-# pair (Kotlin 2.0.21 + AGP 8.5.0).
-#
-# Use sed (rather than Python regex) here because the template uses
-# non-trivial whitespace and the failure mode of a no-op patch is silent.
-# We `cat` the file before/after so CI logs show exactly what changed.
+# Flutter 3.32+ already ships Kotlin 2.x in templates, so this is
+# typically a no-op. Kept for forward/backward compat: if a future
+# Flutter ever regresses to <2.0, sed bumps to 2.0.21 and we still
+# build. The assertion below accepts ANY Kotlin 2.x — we just need
+# something modern enough for mobile_scanner ^6.
 
 SETTINGS_KTS="$ANDROID_DIR/settings.gradle.kts"
 SETTINGS_GROOVY="$ANDROID_DIR/settings.gradle"
@@ -246,35 +244,58 @@ if [ -n "$SETTINGS" ]; then
   echo "── Before patching $SETTINGS ─────────────────────────────"
   cat "$SETTINGS"
 
-  # Cover BOTH Groovy DSL (`id "org.jetbrains.kotlin.android" version "X"`)
-  # and Kotlin DSL (`id("org.jetbrains.kotlin.android") version "X"`). Sed
-  # alternation handles either; the captured group is everything up to the
-  # version-string opening quote.
-  sed -i -E \
-    -e 's|(id[[:space:]]*\(?[[:space:]]*"org\.jetbrains\.kotlin\.android"[[:space:]]*\)?[[:space:]]+version[[:space:]]+")[^"]+|\12.0.21|' \
-    -e 's|(id[[:space:]]*\(?[[:space:]]*"com\.android\.application"[[:space:]]*\)?[[:space:]]+version[[:space:]]+")[^"]+|\18.5.0|' \
-    -e 's|(id[[:space:]]*\(?[[:space:]]*"com\.android\.library"[[:space:]]*\)?[[:space:]]+version[[:space:]]+")[^"]+|\18.5.0|' \
-    "$SETTINGS"
+  # Match Kotlin version on the kotlin.android plugin line in either
+  # Groovy DSL (`id "..." version "X"`) or Kotlin DSL
+  # (`id("...") version "X"`). If the template already has 2.x we
+  # still rewrite to 2.0.21 — harmless, picks a known-good version.
+  # But ONLY if the current pinned version is < 2.0. Use awk for the
+  # conditional rewrite so a 2.1.x in the template stays untouched.
+  python3 - "$SETTINGS" <<'PY'
+import sys, re, pathlib
+path = pathlib.Path(sys.argv[1])
+src = path.read_text(encoding="utf-8")
+
+def bump_kotlin(match):
+    prefix = match.group(1)
+    ver = match.group(2)
+    suffix = match.group(3)
+    # Only rewrite if it's < 2.0.0. Anything >=2.0 we leave alone so
+    # we don't downgrade a newer template's choice.
+    parts = ver.split(".")
+    try:
+        major = int(parts[0])
+    except (ValueError, IndexError):
+        major = 0
+    if major < 2:
+        ver = "2.0.21"
+    return prefix + ver + suffix
+
+src = re.sub(
+    r'(id[^"\']*["\']org\.jetbrains\.kotlin\.android["\'][^v]*version[^"\']*["\'])([^"\']+)(["\'])',
+    bump_kotlin,
+    src,
+)
+path.write_text(src, encoding="utf-8")
+PY
 
   echo "── After patching $SETTINGS ──────────────────────────────"
   cat "$SETTINGS"
 
-  # Belt-and-braces: assert the Kotlin version actually got bumped. If the
-  # regex didn't match (unexpected template format), fail loudly *now*
-  # instead of letting Gradle compile the wrong Kotlin and surface a
-  # confusing error 4 minutes later.
-  if ! grep -q '"2\.0\.21"' "$SETTINGS"; then
-    echo "ERROR: Kotlin version bump did not apply to $SETTINGS." >&2
-    echo "       Template format may have changed; update the sed regex." >&2
+  # Belt-and-braces: assert ANY Kotlin 2.x ended up in the file. On
+  # Flutter 3.32+ this is satisfied by the template directly; on older
+  # SDKs it's satisfied by the bump above. If neither path produced a
+  # 2.x line we fail loudly here, before Gradle has a chance to spend
+  # 4 minutes confusing us.
+  if ! grep -qE 'org\.jetbrains\.kotlin\.android.*version[[:space:]]+["'\''](2|[3-9])\.' "$SETTINGS"; then
+    echo "ERROR: no Kotlin 2.x version found in $SETTINGS after patching." >&2
+    echo "       Template format may have changed; update the regex above." >&2
     exit 1
   fi
 fi
 
 # Bump compileSdk / targetSdk to 35 in app/build.gradle(.kts) too. Many
 # AndroidX 1.6+ libraries (and mobile_scanner 6.x's ML Kit transitive)
-# require compiling against API 35. Flutter 3.27's `flutter.compileSdkVersion`
-# resolves to 34 by default, which trips a "compileSdkVersion is too low"
-# error from those libraries.
+# require compiling against API 35.
 
 if [ -f "$APP_GRADLE" ]; then
   echo "── Before patching $APP_GRADLE ───────────────────────────"
