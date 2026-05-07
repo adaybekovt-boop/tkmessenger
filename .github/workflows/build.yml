@@ -9,8 +9,15 @@ on:
   workflow_dispatch:
 
 # Pin Flutter once so all jobs agree.
+#
+# 3.32.0 (stable, May 2025) is the first Flutter release whose
+# `flutter create` android template ships with Kotlin Gradle plugin
+# 2.1.x and AGP 8.7.x out of the box. Earlier 3.27.x stuck at Kotlin
+# 1.8.22, which mobile_scanner ^6 refuses to compile against and which
+# kept tripping the "Your project requires a newer version of the
+# Kotlin Gradle plugin" Flutter Fix banner here in CI.
 env:
-  FLUTTER_VERSION: '3.27.4'
+  FLUTTER_VERSION: '3.32.0'
   FLUTTER_CHANNEL: 'stable'
   PROJECT_NAME: 'orbits_flutter'
   PROJECT_ORG: 'com.orbits'
@@ -65,8 +72,6 @@ jobs:
   #     so `flutter build apk --release` produces a sideloadable APK
   #     without a real upload key. Cannot ship to Play Store like this,
   #     but it installs and updates fine on any device.
-  #   • settings.gradle — bump the Kotlin Gradle plugin past 1.8 so
-  #     mobile_scanner ^6 compiles, and pin AGP / SDK to a matching set.
   #
   # The debug keystore lives in actions/cache so the signature stays
   # stable across runs (otherwise updates would require uninstall first).
@@ -145,8 +150,10 @@ jobs:
       # Build per-ABI first (smaller files, what users actually install),
       # then the universal APK as a fallback for "I don't know my CPU"
       # users. Different filenames so they coexist in the output dir.
+      # `--verbose` so any future failure shows the full Gradle trace
+      # in the runner log without us having to rerun with --stacktrace.
       - name: flutter build apk (split per ABI)
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --verbose
 
       - name: flutter build apk (universal fallback)
         run: flutter build apk --release
