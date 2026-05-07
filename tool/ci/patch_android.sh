@@ -229,10 +229,12 @@ fi
 # ─── 5. settings.gradle — Kotlin Gradle plugin + AGP version bumps ──────────
 #
 # Flutter 3.27 templates pin Kotlin to 1.8.22, which mobile_scanner ^6.0.2
-# refuses to compile against (it ships Kotlin 1.9+ idioms — the Flutter Fix
-# panel's "newer version of the Kotlin Gradle plugin" message). We bump
-# both Kotlin and AGP to a known-good pair (Kotlin 2.0.21 + AGP 8.5.0)
-# that satisfies the entire current dependency set.
+# refuses to compile against. We bump both Kotlin and AGP to a known-good
+# pair (Kotlin 2.0.21 + AGP 8.5.0).
+#
+# Use sed (rather than Python regex) here because the template uses
+# non-trivial whitespace and the failure mode of a no-op patch is silent.
+# We `cat` the file before/after so CI logs show exactly what changed.
 
 SETTINGS_KTS="$ANDROID_DIR/settings.gradle.kts"
 SETTINGS_GROOVY="$ANDROID_DIR/settings.gradle"
@@ -241,27 +243,31 @@ if [ -f "$SETTINGS_KTS" ]; then SETTINGS="$SETTINGS_KTS"; fi
 if [ -z "$SETTINGS" ] && [ -f "$SETTINGS_GROOVY" ]; then SETTINGS="$SETTINGS_GROOVY"; fi
 
 if [ -n "$SETTINGS" ]; then
-  python3 - "$SETTINGS" <<'PY'
-import sys, re, pathlib
-path = pathlib.Path(sys.argv[1])
-src = path.read_text(encoding="utf-8")
+  echo "── Before patching $SETTINGS ─────────────────────────────"
+  cat "$SETTINGS"
 
-# Match BOTH Groovy DSL  →  id "org.jetbrains.kotlin.android" version "X"
-# and Kotlin DSL          →  id("org.jetbrains.kotlin.android") version "X"
-patterns = [
-    (r'(id\s*"org\.jetbrains\.kotlin\.android"\s+version\s+")[^"]+(")',          '2.0.21'),
-    (r'(id\s*\(\s*"org\.jetbrains\.kotlin\.android"\s*\)\s+version\s+")[^"]+(")', '2.0.21'),
-    (r'(id\s*"com\.android\.application"\s+version\s+")[^"]+(")',                 '8.5.0'),
-    (r'(id\s*\(\s*"com\.android\.application"\s*\)\s+version\s+")[^"]+(")',       '8.5.0'),
-    (r'(id\s*"com\.android\.library"\s+version\s+")[^"]+(")',                     '8.5.0'),
-    (r'(id\s*\(\s*"com\.android\.library"\s*\)\s+version\s+")[^"]+(")',           '8.5.0'),
-]
-for pat, repl in patterns:
-    src = re.sub(pat, lambda m, r=repl: m.group(1) + r + m.group(2), src)
+  # Cover BOTH Groovy DSL (`id "org.jetbrains.kotlin.android" version "X"`)
+  # and Kotlin DSL (`id("org.jetbrains.kotlin.android") version "X"`). Sed
+  # alternation handles either; the captured group is everything up to the
+  # version-string opening quote.
+  sed -i -E \
+    -e 's|(id[[:space:]]*\(?[[:space:]]*"org\.jetbrains\.kotlin\.android"[[:space:]]*\)?[[:space:]]+version[[:space:]]+")[^"]+|\12.0.21|' \
+    -e 's|(id[[:space:]]*\(?[[:space:]]*"com\.android\.application"[[:space:]]*\)?[[:space:]]+version[[:space:]]+")[^"]+|\18.5.0|' \
+    -e 's|(id[[:space:]]*\(?[[:space:]]*"com\.android\.library"[[:space:]]*\)?[[:space:]]+version[[:space:]]+")[^"]+|\18.5.0|' \
+    "$SETTINGS"
 
-path.write_text(src, encoding="utf-8")
-print(f"Bumped Kotlin/AGP plugin versions in {path}")
-PY
+  echo "── After patching $SETTINGS ──────────────────────────────"
+  cat "$SETTINGS"
+
+  # Belt-and-braces: assert the Kotlin version actually got bumped. If the
+  # regex didn't match (unexpected template format), fail loudly *now*
+  # instead of letting Gradle compile the wrong Kotlin and surface a
+  # confusing error 4 minutes later.
+  if ! grep -q '"2\.0\.21"' "$SETTINGS"; then
+    echo "ERROR: Kotlin version bump did not apply to $SETTINGS." >&2
+    echo "       Template format may have changed; update the sed regex." >&2
+    exit 1
+  fi
 fi
 
 # Bump compileSdk / targetSdk to 35 in app/build.gradle(.kts) too. Many
@@ -271,6 +277,8 @@ fi
 # error from those libraries.
 
 if [ -f "$APP_GRADLE" ]; then
+  echo "── Before patching $APP_GRADLE ───────────────────────────"
+  cat "$APP_GRADLE"
   python3 - "$APP_GRADLE" <<'PY'
 import sys, re, pathlib
 path = pathlib.Path(sys.argv[1])
@@ -282,6 +290,8 @@ src = re.sub(r'targetSdkVersion\s+[^\n]+',    'targetSdkVersion 35',  src)
 path.write_text(src, encoding="utf-8")
 print(f"Bumped compileSdk/targetSdk in {path}")
 PY
+  echo "── After patching $APP_GRADLE ────────────────────────────"
+  cat "$APP_GRADLE"
 fi
 
 echo "── Android patches done."
