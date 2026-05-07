@@ -1,0 +1,268 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Pin Flutter once so all jobs agree.
+env:
+  FLUTTER_VERSION: '3.27.4'
+  FLUTTER_CHANNEL: 'stable'
+  PROJECT_NAME: 'orbits_flutter'
+  PROJECT_ORG: 'com.orbits'
+
+# Allow only one in-flight run per ref. Cancels the previous build when you
+# push again — keeps the queue short and runner minutes low.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────
+  # Lint + tests. Non-fatal: we still ship even if analyze warns, because
+  # the project is mid-migration and `flutter_lints` flags pre-existing
+  # noise we haven't cleaned up yet. The build jobs depend on this so the
+  # report is at least produced.
+  # ────────────────────────────────────────────────────────────────────
+  analyze:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Generate code (drift / build_runner)
+        run: dart run build_runner build --delete-conflicting-outputs
+        continue-on-error: true
+
+      - name: flutter analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        continue-on-error: true
+
+      - name: flutter test
+        run: flutter test --reporter expanded
+        continue-on-error: true
+
+  # ────────────────────────────────────────────────────────────────────
+  # Android. The platform folders aren't checked in — we generate them
+  # fresh on every CI run so a checkout of just `lib/` + `pubspec.yaml`
+  # builds. Then we patch:
+  #   • AndroidManifest.xml — INTERNET, CAMERA, RECORD_AUDIO permissions
+  #     for WebRTC, mobile_scanner and `record`.
+  #   • build.gradle — point release `signingConfig` at the debug keystore
+  #     so `flutter build apk --release` produces a sideloadable APK
+  #     without a real upload key. Cannot ship to Play Store like this,
+  #     but it installs and updates fine on any device.
+  #
+  # The debug keystore lives in actions/cache so the signature stays
+  # stable across runs (otherwise updates would require uninstall first).
+  # ────────────────────────────────────────────────────────────────────
+  build-android:
+    name: Build Android (APK)
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      # Stable signature across runs — without this, every CI build emits
+      # a fresh keystore, so installing v2 over v1 fails with
+      # INSTALL_FAILED_UPDATE_INCOMPATIBLE until the user uninstalls.
+      - name: Cache debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android
+          key: android-debug-keystore-v1
+
+      - name: Ensure debug keystore exists
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -storetype PKCS12 \
+              -storepass android -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Generate android/ + web/ platforms
+        run: |
+          flutter create \
+            --platforms=android,web \
+            --org="$PROJECT_ORG" \
+            --project-name="$PROJECT_NAME" \
+            .
+
+      - name: Patch AndroidManifest + signing config
+        run: |
+          # Normalize line endings just in case Windows committers slipped
+          # CRLF past .gitattributes — bash on Linux chokes on \r.
+          sed -i 's/\r$//' tool/ci/patch_android.sh
+          bash tool/ci/patch_android.sh
+
+      - name: Generate code (drift / build_runner)
+        run: dart run build_runner build --delete-conflicting-outputs
+        continue-on-error: true
+
+      # Build per-ABI first (smaller files, what users actually install),
+      # then the universal APK as a fallback for "I don't know my CPU"
+      # users. Different filenames so they coexist in the output dir.
+      - name: flutter build apk (split per ABI)
+        run: flutter build apk --release --split-per-abi
+
+      - name: flutter build apk (universal fallback)
+        run: flutter build apk --release
+
+      - name: Stage APKs for upload
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk            dist/orbits-android-universal.apk || true
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk  dist/orbits-android-arm64.apk     || true
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk dist/orbits-android-arm32.apk    || true
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk     dist/orbits-android-x86_64.apk    || true
+          ls -lah dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbits-android
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────────
+  # Windows. Same generate-on-the-fly pattern. The `Release/` folder
+  # bundles the .exe alongside the Flutter engine DLL and the
+  # MSVCP/VCRUNTIME runtime DLLs that flutter_windows needs — zipping
+  # the whole folder is what avoids the "VCRUNTIME140.dll missing"
+  # popup users would otherwise see if you only ship the .exe.
+  # ────────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows (EXE)
+    needs: analyze
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Enable windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Generate windows/ + web/ platforms
+        shell: bash
+        run: |
+          flutter create \
+            --platforms=windows,web \
+            --org="$PROJECT_ORG" \
+            --project-name="$PROJECT_NAME" \
+            .
+
+      - name: Generate code (drift / build_runner)
+        run: dart run build_runner build --delete-conflicting-outputs
+        continue-on-error: true
+
+      - name: flutter build windows (release)
+        run: flutter build windows --release
+
+      - name: Bundle VC++ Redistributable runtime DLLs
+        shell: pwsh
+        run: |
+          $rel = "build\windows\x64\runner\Release"
+          # Pull the MSVC runtime from the runner's redist install. These
+          # are what the Flutter runner links against, and shipping them
+          # next to the .exe sidesteps the "VCRUNTIME140.dll not found"
+          # popup on machines without VC++ Redistributable.
+          $redist = Get-ChildItem "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Redist\MSVC" -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $redist) {
+            $redist = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Redist\MSVC" -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+          }
+          if ($redist) {
+            $src = Join-Path $redist.FullName "x64\Microsoft.VC143.CRT"
+            if (Test-Path $src) {
+              Copy-Item "$src\*.dll" $rel -Force
+              Write-Host "Copied VC runtime from $src"
+            }
+          } else {
+            Write-Host "VC redist folder not found — relying on what flutter ships."
+          }
+          Get-ChildItem $rel | Format-Table Name, Length
+
+      - name: Zip Windows release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive `
+            -Path build\windows\x64\runner\Release\* `
+            -DestinationPath dist\orbits-windows-x64.zip `
+            -Force
+          Get-ChildItem dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbits-windows
+          path: dist/orbits-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────────
+  # On a tag like `v0.1.0`, gather the artifacts from the two build jobs
+  # and attach them to a GitHub Release. To cut a release: `git tag v0.1.0
+  # && git push origin v0.1.0`.
+  # ────────────────────────────────────────────────────────────────────
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-android, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Show artifacts
+        run: ls -R artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/orbits-android/*.apk
+            artifacts/orbits-windows/*.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
