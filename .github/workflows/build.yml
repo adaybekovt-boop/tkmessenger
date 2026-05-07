@@ -13,9 +13,7 @@ on:
 # 3.32.0 (stable, May 2025) is the first Flutter release whose
 # `flutter create` android template ships with Kotlin Gradle plugin
 # 2.1.x and AGP 8.7.x out of the box. Earlier 3.27.x stuck at Kotlin
-# 1.8.22, which mobile_scanner ^6 refuses to compile against and which
-# kept tripping the "Your project requires a newer version of the
-# Kotlin Gradle plugin" Flutter Fix banner here in CI.
+# 1.8.22, which mobile_scanner ^6 refuses to compile against.
 env:
   FLUTTER_VERSION: '3.32.0'
   FLUTTER_CHANNEL: 'stable'
@@ -91,8 +89,6 @@ jobs:
       # Make sure SDK platform 35 + matching build-tools are present on
       # the runner. ubuntu-latest ships 33/34 by default; mobile_scanner 6
       # and the ML Kit transitives we patch compileSdk to 35 for need 35.
-      # Without this step Gradle errors with
-      # "compileSdkVersion 35 is not installed".
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
@@ -103,9 +99,6 @@ jobs:
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
 
-      # Stable signature across runs — without this, every CI build emits
-      # a fresh keystore, so installing v2 over v1 fails with
-      # INSTALL_FAILED_UPDATE_INCOMPATIBLE until the user uninstalls.
       - name: Cache debug keystore
         uses: actions/cache@v4
         with:
@@ -138,20 +131,16 @@ jobs:
 
       - name: Patch AndroidManifest + signing config
         run: |
-          # Normalize line endings just in case Windows committers slipped
-          # CRLF past .gitattributes — bash on Linux chokes on \r.
           sed -i 's/\r$//' tool/ci/patch_android.sh
           bash tool/ci/patch_android.sh
 
+      # Drift / build_runner codegen MUST succeed for the app to compile
+      # (lib/storage/* depends on the generated *.g.dart files). Keeping
+      # this fatal so a codegen regression fails the job clearly rather
+      # than cascading into a confusing "Type X not found" cascade later.
       - name: Generate code (drift / build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
-        continue-on-error: true
 
-      # Build per-ABI first (smaller files, what users actually install),
-      # then the universal APK as a fallback for "I don't know my CPU"
-      # users. Different filenames so they coexist in the output dir.
-      # `--verbose` so any future failure shows the full Gradle trace
-      # in the runner log without us having to rerun with --stacktrace.
       - name: flutter build apk (split per ABI)
         run: flutter build apk --release --split-per-abi --verbose
 
@@ -175,6 +164,71 @@ jobs:
           retention-days: 30
 
   # ────────────────────────────────────────────────────────────────────
+  # Web. Static-site bundle, ship as a zip artifact. Two base-href
+  # variants are produced:
+  #   • orbits-web-relative.zip — `./` base-href, drop into any static
+  #     host or open with file:// for local testing.
+  #   • orbits-web-pages.zip    — `/tkmessenger/` base-href, ready for
+  #     GitHub Pages at https://<owner>.github.io/tkmessenger/.
+  # No GitHub Pages auto-deploy here — there's a separate pages.yml
+  # workflow that handles publishing if/when the user wires it up.
+  # ────────────────────────────────────────────────────────────────────
+  build-web:
+    name: Build Web (Static)
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Enable web
+        run: flutter config --enable-web
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Generate web/ platform
+        run: |
+          flutter create \
+            --platforms=web \
+            --org="$PROJECT_ORG" \
+            --project-name="$PROJECT_NAME" \
+            .
+
+      - name: Generate code (drift / build_runner)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: flutter build web (relative base-href)
+        run: flutter build web --release --base-href "./"
+
+      - name: Stage relative-base bundle
+        run: |
+          mkdir -p dist
+          cp -r build/web dist/orbits-web-relative
+          (cd dist && zip -qr orbits-web-relative.zip orbits-web-relative)
+
+      - name: flutter build web (Pages base-href)
+        run: flutter build web --release --base-href "/tkmessenger/"
+
+      - name: Stage Pages bundle
+        run: |
+          cp -r build/web dist/orbits-web-pages
+          (cd dist && zip -qr orbits-web-pages.zip orbits-web-pages)
+          ls -lah dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbits-web
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────────
   # Windows. Same generate-on-the-fly pattern. The `Release/` folder
   # bundles the .exe alongside the Flutter engine DLL and the
   # MSVCP/VCRUNTIME runtime DLLs that flutter_windows needs — zipping
@@ -182,8 +236,8 @@ jobs:
   # popup users would otherwise see if you only ship the .exe.
   #
   # Marked `continue-on-error: true` so a flutter_webrtc / native plugin
-  # snag on the Windows side doesn't gate the Android artifact upload —
-  # ship what builds, fix Windows in a follow-up.
+  # snag on the Windows side doesn't gate the Android / web artifact
+  # uploads — ship what builds, fix Windows in a follow-up.
   # ────────────────────────────────────────────────────────────────────
   build-windows:
     name: Build Windows (EXE)
@@ -225,10 +279,6 @@ jobs:
         shell: pwsh
         run: |
           $rel = "build\windows\x64\runner\Release"
-          # Pull the MSVC runtime from the runner's redist install. These
-          # are what the Flutter runner links against, and shipping them
-          # next to the .exe sidesteps the "VCRUNTIME140.dll not found"
-          # popup on machines without VC++ Redistributable.
           $redist = Get-ChildItem "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Redist\MSVC" -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
           if (-not $redist) {
             $redist = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Redist\MSVC" -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
@@ -262,14 +312,13 @@ jobs:
           retention-days: 30
 
   # ────────────────────────────────────────────────────────────────────
-  # On a tag like `v0.1.0`, gather the artifacts from the two build jobs
-  # and attach them to a GitHub Release. To cut a release: `git tag v0.1.0
-  # && git push origin v0.1.0`.
+  # On a tag like `v0.1.0`, gather artifacts from every platform build
+  # and attach them to a GitHub Release.
   # ────────────────────────────────────────────────────────────────────
   release:
     name: GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-android, build-windows]
+    needs: [build-android, build-web, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -285,6 +334,7 @@ jobs:
         with:
           files: |
             artifacts/orbits-android/*.apk
+            artifacts/orbits-web/*.zip
             artifacts/orbits-windows/*.zip
           generate_release_notes: true
           draft: false
