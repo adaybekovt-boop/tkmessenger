@@ -18,11 +18,11 @@
 
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:mime/mime.dart';
@@ -405,21 +405,21 @@ class _ChatViewPageState extends ConsumerState<ChatViewPage> {
   /// (`src/core/attachmentPreview.js:58-171`) — 320px longest-side, JPEG
   /// quality steps down until the encoded URL fits the cap.
   ///
-  /// Heavy work (decode → resize → re-encode) runs inside `Isolate.run`
-  /// so a multi-megabyte JPEG doesn't freeze the UI thread for 300-800 ms
-  /// while the user is mid-send. On native this spawns a real background
-  /// isolate; on web it falls back to running on the main thread (Dart-
-  /// to-JS has no thread support) which is functionally identical to the
-  /// pre-isolate version, no regression. The function we hand to
-  /// `Isolate.run` must be a top-level / static so its closure can be
-  /// shipped to the worker — `_decodeAndEncodeThumb` lives at file scope.
+  /// Heavy work (decode → resize → re-encode) goes through `compute()`
+  /// from foundation so a multi-megabyte JPEG doesn't freeze the UI
+  /// thread for 300-800 ms while the user is mid-send. On native that's
+  /// a real background isolate; on web it falls back to running on the
+  /// main thread (dart2js / dart2wasm have no `dart:isolate`) which is
+  /// functionally identical to the pre-isolate version, no regression.
+  /// `_decodeAndEncodeThumb` lives at file scope so its body is sendable
+  /// to a worker isolate — closures over `this` would not be.
   ///
   /// On any failure (HEIC on a platform without a native decoder, etc.)
   /// we return zero dims + a null thumb so the bubble falls back to the
   /// "Изображение" placeholder — better than refusing the whole send.
   Future<_ThumbResult> _buildImageThumb(Uint8List bytes) async {
     try {
-      return await Isolate.run(() => _decodeAndEncodeThumb(bytes));
+      return await compute(_decodeAndEncodeThumb, bytes);
     } catch (_) {
       return const _ThumbResult(null, 0, 0);
     }
@@ -1056,9 +1056,9 @@ class _ThumbResult {
 
 /// Heavy-side of `_buildImageThumb`: decode, resize to ≤320 px on the
 /// longest side, then encode JPEG with quality stepping down until the
-/// raw payload fits the 33 KB budget (≈48 KB after base64). Runs inside
-/// `Isolate.run` on native so it doesn't block the UI thread; the
-/// function is at file scope so its body is sendable to a worker isolate
+/// raw payload fits the 33 KB budget (≈48 KB after base64). Runs through
+/// `compute()` on native so it doesn't block the UI thread; the function
+/// is at file scope so its body is sendable to a worker isolate
 /// (closures over `this` would not be).
 _ThumbResult _decodeAndEncodeThumb(Uint8List bytes) {
   final decoded = img.decodeImage(bytes);
