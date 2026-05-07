@@ -52,9 +52,16 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
         continue-on-error: true
 
+      # Hard-fail on Dart compile errors (the analyzer treats those as
+      # `error` severity even with --no-fatal-infos --no-fatal-warnings).
+      # Without this gate a typo or wrong-version API call sails past
+      # analyze and we only find out 6+ minutes later when `flutter build
+      # apk` falls over on the kernel compile, with no actionable log
+      # surfaced in the GitHub UI. Warnings/infos still don't block —
+      # the project is mid-migration and has plenty of pre-existing
+      # noise that's tracked separately.
       - name: flutter analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-        continue-on-error: true
 
       - name: flutter test
         run: flutter test --reporter expanded

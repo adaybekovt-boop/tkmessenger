@@ -198,26 +198,29 @@ class SecureKekVault {
 
   // ─── Platform option builders ────────────────────────────────────
 
+  // flutter_secure_storage 10.0.0-beta.4 ships a slimmed-down options
+  // surface compared to what the original draft of this file targeted:
+  //   • IOSOptions has no typed `accessControlFlags` list — the v10 API
+  //     exposes `accessControlSettings` as a raw String? that maps onto
+  //     SecAccessControlCreateFlags at the platform layer. There's no
+  //     enum helper yet, so we leave it null and rely on
+  //     `accessibility` alone for now.
+  //   • AndroidOptions has no `.biometric()` named constructor, no
+  //     `enforceBiometrics`, no `biometricPromptTitle/Subtitle`. The
+  //     biometric prompt API was deferred out of the v10 beta and isn't
+  //     reachable through Options.
+  //
+  // Net effect: data is still hardware-backed (iOS keychain + Android
+  // Keystore via EncryptedSharedPreferences), but the per-read biometric
+  // gate has to be reintroduced via `local_auth` once we wire it in. Tracked
+  // as a follow-up — for the web/desktop-first launch this code path
+  // returns `unsupported` early anyway (see [isSupported]).
   IOSOptions _iosOptions() => const IOSOptions(
         // Blocks iCloud backup + restore-to-another-device.
         accessibility: KeychainAccessibility.unlocked_this_device,
-        // Tie the ciphertext to the current biometric set — any enrollment
-        // change invalidates the wrapping key.
-        accessControlFlags: [
-          AccessControlFlag.biometryCurrentSet,
-          AccessControlFlag.privateKeyUsage,
-        ],
       );
 
-  AndroidOptions _androidOptions() => AndroidOptions.biometric(
-        // Forces setUserAuthenticationRequired(true) on the Keystore key;
-        // any biometric enrollment change throws KeyPermanentlyInvalidated.
-        enforceBiometrics: true,
-        // Localised Russian copy for the system prompt — keeps UX aligned
-        // with the rest of the app.
-        biometricPromptTitle: 'Разблокировка Orbits',
-        biometricPromptSubtitle: 'Подтвердите личность для доступа к ключам',
-      );
+  AndroidOptions _androidOptions() => const AndroidOptions();
 
   KekRetrieveResult _mapPlatformException(PlatformException e) {
     final msg = e.message ?? '';
