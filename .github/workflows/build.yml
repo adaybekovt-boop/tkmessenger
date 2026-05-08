@@ -210,8 +210,21 @@ jobs:
       - name: Generate code (drift / build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
 
+      # Two bundles, two base-href flavors:
+      #
+      #   • relative (./)   — for static hosts that aren't at the domain
+      #     root, and for `file://` previews. `flutter build web` itself
+      #     refuses `--base-href "./"` ("should start and end with /"),
+      #     so we build with `/` and post-process index.html to swap
+      #     `<base href="/">` → `<base href="./">`. Same trick the
+      #     Flutter team's own `flutter_tools/build/web` example uses.
+      #
+      #   • Pages (/tkmessenger/) — built directly, no rewriting needed.
       - name: flutter build web (relative base-href)
-        run: flutter build web --release --base-href "./"
+        run: |
+          flutter build web --release --base-href "/"
+          # rewrite to relative ./ for static-host / file:// previews
+          sed -i 's|<base href="/">|<base href="./">|' build/web/index.html
 
       - name: Stage relative-base bundle
         run: |
