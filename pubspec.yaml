@@ -14,8 +14,22 @@ dependencies:
     sdk: flutter
 
   # Crypto (porting src/core/crypto.js, doubleRatchet.js, x3dh.js, identityKey.js)
+  #
+  # `cryptography_flutter` was originally listed here for the native-backed
+  # impls (Secure Enclave on iOS, AndroidKeyStore on Android). It's been
+  # dropped because:
+  #   • Nothing under lib/ actually imports it — the pure-Dart `cryptography`
+  #     package covers every algorithm we use (AES-GCM, PBKDF2, HKDF,
+  #     ECDH-P256, ECDSA-P256). Native-backed mode requires an explicit
+  #     `FlutterCryptography.enable()` call that was never wired in.
+  #   • 2.3.4 (what pub picks for ^2.3.2 on Dart 3.8) ships a broken
+  #     `_internal.dart` ("Undefined name 'internal'") and 2.3.2's
+  #     `android/build.gradle` is missing a namespace, which AGP 8.x
+  #     rejects — that was the actual root cause of the Android build
+  #     failure post-Kotlin-2.x fix.
+  # Add it back (and pin a stable release) if/when we ever turn on
+  # hardware-backed crypto.
   cryptography: ^2.7.0           # AES-GCM, PBKDF2, HKDF, ECDH P-256, ECDSA P-256
-  cryptography_flutter: ^2.3.2   # Native-backed implementations (Secure Enclave on iOS)
   pointycastle: ^3.9.1           # scrypt (the cryptography package doesn't ship it)
   convert: ^3.1.1                # hex / base64 helpers
 
@@ -86,26 +100,6 @@ dependencies:
   # deps and breaks under Android 16 KB page alignment). v6 ships with
   # 16-KB-aligned native libs, which we need for Play Store submission.
   mobile_scanner: ^6.0.2
-
-# Force-pin packages that have known-broken releases under Dart 3.8 /
-# Flutter 3.32. These overrides shadow whatever pub picks for the
-# `^` ranges above.
-#
-#   cryptography_flutter — 2.3.4 ships a busted `_internal.dart` that
-#   imports `@internal` from `package:meta` without aliasing it, so the
-#   compiler hits "Undefined name 'internal'" on every build. 2.3.2 is
-#   the last release where the file is consistent. The build bug is
-#   tracked upstream; until a fixed release lands, an exact pin keeps
-#   us off the broken version.
-#
-#   record_linux — 0.7.2 is missing `RecordMethodChannelPlatformInterface`
-#   members (e.g. `hasPermission` lost a named arg). 0.7.0 still
-#   matches the published `record_platform_interface` shape and isn't
-#   pulled in by Android / Windows builds anyway, but pin it so anyone
-#   running on Linux doesn't trip over it.
-dependency_overrides:
-  cryptography_flutter: 2.3.2
-  record_linux: 0.7.0
 
 dev_dependencies:
   flutter_test:
