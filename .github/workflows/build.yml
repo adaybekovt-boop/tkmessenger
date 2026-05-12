@@ -48,17 +48,27 @@ jobs:
       - name: flutter pub get
         run: flutter pub get
 
+      # Codegen failures now fail the job — a missing `database.g.dart`
+      # cascades into a confusing "Type _$OrbitsDatabase not found" wall
+      # downstream, much harder to read than the real codegen error.
       - name: Generate code (drift / build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
-        continue-on-error: true
 
+      # Hard-fail on Dart compile errors (the analyzer treats those as
+      # `error` severity even with --no-fatal-infos --no-fatal-warnings).
+      # Without this gate a typo or wrong-version API call sails past
+      # analyze and we only find out 6+ minutes later when `flutter build
+      # apk` falls over on the kernel compile, with no actionable log
+      # surfaced in the GitHub UI. Warnings/infos still don't block —
+      # the project is mid-migration and has plenty of pre-existing
+      # noise that's tracked separately.
       - name: flutter analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-        continue-on-error: true
 
+      # Test failures now also fail the job; the crypto roundtrip suite
+      # is pure-Dart and stable, so any red here is a real regression.
       - name: flutter test
         run: flutter test --reporter expanded
-        continue-on-error: true
 
   # ────────────────────────────────────────────────────────────────────
   # Android. The platform folders aren't checked in — we generate them
@@ -203,8 +213,21 @@ jobs:
       - name: Generate code (drift / build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
 
+      # Two bundles, two base-href flavors:
+      #
+      #   • relative (./)   — for static hosts that aren't at the domain
+      #     root, and for `file://` previews. `flutter build web` itself
+      #     refuses `--base-href "./"` ("should start and end with /"),
+      #     so we build with `/` and post-process index.html to swap
+      #     `<base href="/">` → `<base href="./">`. Same trick the
+      #     Flutter team's own `flutter_tools/build/web` example uses.
+      #
+      #   • Pages (/tkmessenger/) — built directly, no rewriting needed.
       - name: flutter build web (relative base-href)
-        run: flutter build web --release --base-href "./"
+        run: |
+          flutter build web --release --base-href "/"
+          # rewrite to relative ./ for static-host / file:// previews
+          sed -i 's|<base href="/">|<base href="./">|' build/web/index.html
 
       - name: Stage relative-base bundle
         run: |
