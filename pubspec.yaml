@@ -101,6 +101,28 @@ dependencies:
   # 16-KB-aligned native libs, which we need for Play Store submission.
   mobile_scanner: ^6.0.2
 
+# Pin `record_platform_interface` to the 1.2.x line. The `record` package
+# family suffers periodic version drift between the interface and its
+# per-platform impls: `record_platform_interface` 1.3.x added named
+# arguments + extra methods that `record_linux` 0.7.2 (latest, what pub
+# would otherwise resolve) doesn't implement. Result: every CI build —
+# Android, Windows, even Web — fails at the Dart kernel compile with
+#
+#   record_linux.dart(12,7): The non-abstract class 'RecordLinux' is
+#   missing implementations for these members
+#   record_linux.dart(36,16): The method 'RecordLinux.hasPermission' has
+#   fewer named arguments than those of overridden method
+#   'RecordMethodChannelPlatformInterface.hasPermission'
+#
+# even though we never target Linux desktop — Flutter compiles every Dart
+# file in the transitive dep graph regardless of build platform.
+#
+# Holding the interface at 1.2.x makes record_linux 0.7.2 (and its
+# siblings for the platforms we do ship) satisfy the contract again.
+# Revisit when `record_linux` 0.8.x catches up to interface 1.3.x.
+dependency_overrides:
+  record_platform_interface: '>=1.2.0 <1.3.0'
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
