@@ -65,17 +65,20 @@ dependencies:
   # VoiceRecorder.jsx, VoicePlayer.jsx, AttachmentBubble.jsx and the
   # paperclip picker in Chats.jsx).
   #
-  # `record` handles audio capture (Opus/WebM on Android & web, AAC/m4a on
-  # iOS) and exposes an amplitude stream so we can draw the live waveform
-  # identical to the JS rAF sampler. `just_audio` plays the inbound blob —
-  # it can swap sources on the fly which we need for "load bytes from
-  # Drift, hand to a Uri-less source". `file_picker` is the native file
-  # sheet (single-file; matches the JS `<input type="file">`). `mime`
-  # infers content-type from filename when the picker doesn't give one
-  # (common on Android for odd extensions). `image` resizes full-res
-  # photos down to the ≤48 KiB JPEG thumbnail the JS receiver expects in
-  # `attachment.thumb`.
-  record: ^5.1.2
+  # NOTE: `record` (audio recording) was removed because its transitive
+  # chain (record_platform_interface ↔ record_linux ↔ record_web ↔ …)
+  # is in a perma-drift state on pub.dev — every consistent pin leaves
+  # one platform package incompatible with another, and Flutter compiles
+  # the full Dart graph for every target, so the drift broke Android,
+  # Windows AND the web dart2js pass simultaneously. `voice_recorder_sheet.dart`
+  # has been stubbed out (placeholder UI); re-add `record` and revert
+  # the stub once the upstream chain stabilises.
+  #
+  # `just_audio` plays the inbound blob — it can swap sources on the fly
+  # which we need for "load bytes from Drift, hand to a Uri-less source".
+  # `file_picker` is the native file sheet. `mime` infers content-type
+  # from filename when the picker doesn't give one. `image` resizes
+  # full-res photos down to the ≤48 KiB JPEG thumbnail.
   just_audio: ^0.9.42
   file_picker: ^8.1.4
   mime: ^2.0.0
@@ -100,28 +103,6 @@ dependencies:
   # deps and breaks under Android 16 KB page alignment). v6 ships with
   # 16-KB-aligned native libs, which we need for Play Store submission.
   mobile_scanner: ^6.0.2
-
-# Pin `record_platform_interface` to the 1.2.x line. The `record` package
-# family suffers periodic version drift between the interface and its
-# per-platform impls: `record_platform_interface` 1.3.x added named
-# arguments + extra methods that `record_linux` 0.7.2 (latest, what pub
-# would otherwise resolve) doesn't implement. Result: every CI build —
-# Android, Windows, even Web — fails at the Dart kernel compile with
-#
-#   record_linux.dart(12,7): The non-abstract class 'RecordLinux' is
-#   missing implementations for these members
-#   record_linux.dart(36,16): The method 'RecordLinux.hasPermission' has
-#   fewer named arguments than those of overridden method
-#   'RecordMethodChannelPlatformInterface.hasPermission'
-#
-# even though we never target Linux desktop — Flutter compiles every Dart
-# file in the transitive dep graph regardless of build platform.
-#
-# Holding the interface at 1.2.x makes record_linux 0.7.2 (and its
-# siblings for the platforms we do ship) satisfy the contract again.
-# Revisit when `record_linux` 0.8.x catches up to interface 1.3.x.
-dependency_overrides:
-  record_platform_interface: '>=1.2.0 <1.3.0'
 
 dev_dependencies:
   flutter_test:
