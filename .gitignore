@@ -1,0 +1,40 @@
+# Flutter / Dart build artifacts
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+pubspec.lock
+
+# Generated platform folders. CI recreates these with `flutter create`.
+android/
+ios/
+linux/
+macos/
+windows/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Test / coverage output
+coverage/
+*.lcov
+test/.test_coverage.dart
+
+# Local environment files
+.env
+.env.local
+*.key
+*.pem

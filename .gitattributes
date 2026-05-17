@@ -1,0 +1,12 @@
+# Force LF for shell scripts and YAML so they work on Linux/macOS CI
+# runners regardless of the committer's git autocrlf setting.
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+Dockerfile  text eol=lf
+
+# Dart / Flutter source — let git handle (LF in repo, native on checkout)
+*.dart      text
+*.gradle    text
+*.kts       text
