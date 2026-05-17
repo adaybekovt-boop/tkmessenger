@@ -293,9 +293,9 @@ PY
   fi
 fi
 
-# Bump compileSdk / targetSdk to 35 in app/build.gradle(.kts) too. Many
-# AndroidX 1.6+ libraries (and mobile_scanner 6.x's ML Kit transitive)
-# require compiling against API 35.
+# Bump compileSdk / targetSdk to 36 and pin NDK 27 in app/build.gradle(.kts).
+# Current flutter_secure_storage / mobile_scanner releases require API 36,
+# and the native plugin graph requires NDK 27.0.12077973.
 
 if [ -f "$APP_GRADLE" ]; then
   echo "── Before patching $APP_GRADLE ───────────────────────────"
@@ -304,12 +304,13 @@ if [ -f "$APP_GRADLE" ]; then
 import sys, re, pathlib
 path = pathlib.Path(sys.argv[1])
 src = path.read_text(encoding="utf-8")
-src = re.sub(r'compileSdk\s*=\s*[^\n]+',     'compileSdk = 35',     src)
-src = re.sub(r'compileSdkVersion\s+[^\n]+',   'compileSdkVersion 35', src)
-src = re.sub(r'targetSdk\s*=\s*[^\n]+',      'targetSdk = 35',      src)
-src = re.sub(r'targetSdkVersion\s+[^\n]+',    'targetSdkVersion 35',  src)
+src = re.sub(r'compileSdk\s*=\s*[^\n]+',     'compileSdk = 36',     src)
+src = re.sub(r'compileSdkVersion\s+[^\n]+',   'compileSdkVersion 36', src)
+src = re.sub(r'targetSdk\s*=\s*[^\n]+',      'targetSdk = 36',      src)
+src = re.sub(r'targetSdkVersion\s+[^\n]+',    'targetSdkVersion 36',  src)
+src = re.sub(r'ndkVersion\s*=\s*[^\n]+',      'ndkVersion = "27.0.12077973"', src)
 path.write_text(src, encoding="utf-8")
-print(f"Bumped compileSdk/targetSdk in {path}")
+print(f"Bumped compileSdk/targetSdk and NDK in {path}")
 PY
   echo "── After patching $APP_GRADLE ────────────────────────────"
   cat "$APP_GRADLE"

@@ -96,12 +96,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Make sure SDK platform 35 + matching build-tools are present on
+      # Make sure SDK platform 36 + matching build-tools/NDK are present on
       # the runner. ubuntu-latest ships 33/34 by default; mobile_scanner 6
-      # and the ML Kit transitives we patch compileSdk to 35 for need 35.
+      # and current Android plugins require compileSdk 36 + NDK 27.
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+          packages: 'platforms;android-36 build-tools;36.0.0 platform-tools ndk;27.0.12077973'
 
       - uses: subosito/flutter-action@v2
         with:
