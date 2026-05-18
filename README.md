@@ -7,7 +7,7 @@ Flutter port of the Orbits P2P messenger.
 GitHub Actions builds the project on every push to `main`:
 
 - Android APK artifacts
-- Windows release zip
+- Windows single-file installer EXE
 - Flutter web static bundle
 - GitHub Pages deployment
 
@@ -27,6 +27,21 @@ flutter build web --release --base-href /tkmessenger/ --pwa-strategy offline-fir
 After the workflow succeeds, the app should be available at:
 
 ```text
+https://adaybekovt-boop.github.io/tkmessenger/
+```
+
+## Direct Download Links
+
+Use these URLs for website buttons:
+
+```text
+Windows EXE:
+https://github.com/adaybekovt-boop/tkmessenger/releases/latest/download/orbits-windows-x64.exe
+
+Android APK:
+https://github.com/adaybekovt-boop/tkmessenger/releases/latest/download/orbits-android-universal.apk
+
+Flutter Web:
 https://adaybekovt-boop.github.io/tkmessenger/
 ```
 

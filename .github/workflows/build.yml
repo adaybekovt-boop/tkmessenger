@@ -252,21 +252,15 @@ jobs:
           retention-days: 30
 
   # ────────────────────────────────────────────────────────────────────
-  # Windows. Same generate-on-the-fly pattern. The `Release/` folder
-  # bundles the .exe alongside the Flutter engine DLL and the
-  # MSVCP/VCRUNTIME runtime DLLs that flutter_windows needs — zipping
-  # the whole folder is what avoids the "VCRUNTIME140.dll missing"
-  # popup users would otherwise see if you only ship the .exe.
-  #
-  # Marked `continue-on-error: true` so a flutter_webrtc / native plugin
-  # snag on the Windows side doesn't gate the Android / web artifact
-  # uploads — ship what builds, fix Windows in a follow-up.
+  # Windows. Flutter's raw `Release/` folder contains an exe plus DLLs and
+  # data files, so shipping only that runner exe would not start on a user's
+  # machine. We wrap the full folder into a single Inno Setup installer exe
+  # and upload that one file for website "Download for Windows" buttons.
   # ────────────────────────────────────────────────────────────────────
   build-windows:
     name: Build Windows (EXE)
     needs: analyze
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -298,6 +292,10 @@ jobs:
       - name: flutter build windows (release)
         run: flutter build windows --release
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
       - name: Bundle VC++ Redistributable runtime DLLs
         shell: pwsh
         run: |
@@ -317,21 +315,69 @@ jobs:
           }
           Get-ChildItem $rel | Format-Table Name, Length
 
-      - name: Zip Windows release
+      - name: Build single-file Windows installer
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Compress-Archive `
-            -Path build\windows\x64\runner\Release\* `
-            -DestinationPath dist\orbits-windows-x64.zip `
-            -Force
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) {
+            throw "ISCC.exe not found after installing Inno Setup"
+          }
+          $version = "${{ github.ref_name }}"
+          if ($version.StartsWith("v")) {
+            $version = $version.Substring(1)
+          }
+          if ($version -notmatch '^\d+(\.\d+){1,3}$') {
+            $version = "0.1.0"
+          }
+          $iss = @"
+          #define MyAppName "Orbits"
+          #define MyAppVersion "$version"
+          #define MyAppExeName "orbits_flutter.exe"
+
+          [Setup]
+          AppId={{D47395D5-16CC-4ED3-98DF-0E611CC58F96}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          DefaultDirName={autopf}\Orbits
+          DefaultGroupName=Orbits
+          DisableProgramGroupPage=yes
+          OutputDir=dist
+          OutputBaseFilename=orbits-windows-x64
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=x64
+          ArchitecturesInstallIn64BitMode=x64
+          WizardStyle=modern
+
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{group}\Orbits"; Filename: "{app}\{#MyAppExeName}"
+          Name: "{commondesktop}\Orbits"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+          [Tasks]
+          Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
+
+          [Run]
+          Filename: "{app}\{#MyAppExeName}"; Description: "Launch Orbits"; Flags: nowait postinstall skipifsilent
+          "@
+          Set-Content -Path installer.iss -Value $iss -Encoding UTF8
+          & $iscc installer.iss
+          if (-not (Test-Path dist\orbits-windows-x64.exe)) {
+            throw "Windows installer was not created"
+          }
           Get-ChildItem dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: orbits-windows
-          path: dist/orbits-windows-x64.zip
-          if-no-files-found: warn
+          path: dist/orbits-windows-x64.exe
+          if-no-files-found: error
           retention-days: 30
 
   # ────────────────────────────────────────────────────────────────────
@@ -357,8 +403,14 @@ jobs:
         with:
           files: |
             artifacts/orbits-android/*.apk
-            artifacts/orbits-web/*.zip
-            artifacts/orbits-windows/*.zip
-          generate_release_notes: true
+            artifacts/orbits-windows/*.exe
+          body: |
+            ## Direct Links
+
+            - Windows EXE: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/orbits-windows-x64.exe
+            - Android APK: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/orbits-android-universal.apk
+            - Flutter Web: https://adaybekovt-boop.github.io/tkmessenger/
+
+            Use the links above for website download buttons. The web app is served by GitHub Pages, so it opens directly in the browser instead of downloading a zip.
           draft: false
           prerelease: false
