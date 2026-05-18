@@ -12,6 +12,7 @@
 // remember to include it. Call overlay + install / update banners still
 // pending — they depend on providers that haven't landed yet.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,6 +36,8 @@ enum AppTab { chats, drop, games, settings }
 class AppShell extends ConsumerWidget {
   const AppShell({super.key});
 
+  static const double _desktopFrameMaxWidth = 520;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(activeTabProvider);
@@ -54,6 +57,59 @@ class AppShell extends ConsumerWidget {
     ref.listen(messagingNotifierProvider, (_, __) {});
     ref.listen(callsNotifierProvider, (_, __) {});
 
+    final shellBody = Stack(
+      children: [
+        Positioned.fill(
+          child: PeerStatusPillOverlay(
+            child: IndexedStack(
+              index: active.index,
+              children: const [
+                ChatsPage(),
+                DropPage(),
+                GamesPage(),
+                SettingsPage(),
+              ],
+            ),
+          ),
+        ),
+        const Positioned.fill(child: CallOverlayMount()),
+      ],
+    );
+    final bottomBar = OrbsTabBar(
+      activeIndex: active.index,
+      onTap: (i) {
+        // hapticTap mirrors the JS `onClick={() => hapticTap()}` that
+        // every TabButton carried. The helper already self-throttles so
+        // fast taps don't stutter.
+        hapticTap();
+        ref.read(activeTabProvider.notifier).state = AppTab.values[i];
+      },
+      tabs: const [
+        OrbsTabSpec(
+          icon: Icons.chat_bubble_outline,
+          activeIcon: Icons.chat_bubble,
+          label: 'Чаты',
+        ),
+        OrbsTabSpec(
+          icon: Icons.send_outlined,
+          activeIcon: Icons.send,
+          label: 'Drop',
+        ),
+        OrbsTabSpec(
+          icon: Icons.sports_esports_outlined,
+          activeIcon: Icons.sports_esports,
+          label: 'Игры',
+        ),
+        OrbsTabSpec(
+          icon: Icons.menu_outlined,
+          activeIcon: Icons.menu,
+          label: 'Ещё',
+        ),
+      ],
+    );
+
+    final centerDesktop = _isDesktopHost(context);
+
     return Scaffold(
       // IndexedStack keeps every tab's subtree mounted so scroll positions,
       // text-field contents, and in-progress animations survive a switch —
@@ -67,56 +123,37 @@ class AppShell extends ConsumerWidget {
       //      active (scrim + controls), zero-size otherwise. Sits above
       //      the pill so a ringing-call scrim isn't visually broken up by
       //      the pill chip.
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: PeerStatusPillOverlay(
-              child: IndexedStack(
-                index: active.index,
-                children: const [
-                  ChatsPage(),
-                  DropPage(),
-                  GamesPage(),
-                  SettingsPage(),
-                ],
+      body: centerDesktop
+          ? Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: _desktopFrameMaxWidth,
+                ),
+                child: shellBody,
               ),
-            ),
-          ),
-          const Positioned.fill(child: CallOverlayMount()),
-        ],
-      ),
-      bottomNavigationBar: OrbsTabBar(
-        activeIndex: active.index,
-        onTap: (i) {
-          // hapticTap mirrors the JS `onClick={() => hapticTap()}` that
-          // every TabButton carried. The helper already self-throttles so
-          // fast taps don't stutter.
-          hapticTap();
-          ref.read(activeTabProvider.notifier).state = AppTab.values[i];
-        },
-        tabs: const [
-          OrbsTabSpec(
-            icon: Icons.chat_bubble_outline,
-            activeIcon: Icons.chat_bubble,
-            label: 'Чаты',
-          ),
-          OrbsTabSpec(
-            icon: Icons.send_outlined,
-            activeIcon: Icons.send,
-            label: 'Drop',
-          ),
-          OrbsTabSpec(
-            icon: Icons.sports_esports_outlined,
-            activeIcon: Icons.sports_esports,
-            label: 'Игры',
-          ),
-          OrbsTabSpec(
-            icon: Icons.menu_outlined,
-            activeIcon: Icons.menu,
-            label: 'Ещё',
-          ),
-        ],
-      ),
+            )
+          : shellBody,
+      bottomNavigationBar: centerDesktop
+          ? Center(
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: _desktopFrameMaxWidth,
+                ),
+                child: bottomBar,
+              ),
+            )
+          : bottomBar,
     );
+  }
+
+  bool _isDesktopHost(BuildContext context) {
+    if (kIsWeb) return false;
+    if (MediaQuery.sizeOf(context).width <= 700) return false;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.macOS || TargetPlatform.windows || TargetPlatform.linux =>
+        true,
+      _ => false,
+    };
   }
 }

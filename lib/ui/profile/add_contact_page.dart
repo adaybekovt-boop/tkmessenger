@@ -26,6 +26,7 @@ import '../../peer/helpers.dart';
 import '../../state/local_profile_provider.dart';
 import '../../storage/db.dart' as db;
 import '../../themes/orbits_tokens.dart';
+import 'my_qr_page.dart';
 
 class AddContactPage extends ConsumerStatefulWidget {
   const AddContactPage({super.key});
@@ -101,9 +102,25 @@ class _AddContactPageState extends ConsumerState<AddContactPage>
 
   @override
   Widget build(BuildContext context) {
+    final peerId = ref.watch(currentPeerIdProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Добавить контакт'),
+        actions: [
+          if (peerId != null && peerId.isNotEmpty)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => MyQrPage(peerId: peerId),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.qr_code_2, size: 20),
+              label: const Text('Мой QR'),
+            ),
+          const SizedBox(width: 4),
+        ],
         bottom: TabBar(
           controller: _tabs,
           tabs: const [
