@@ -1,10 +1,11 @@
-// Port of `src/components/PeerStatusPill.jsx` — the tiny floating chip in
-// the top-right that tells the user whether WebRTC signaling is up. Shows
-// peerId (truncated), current status color, error string on tap.
+// Port of `src/components/PeerStatusPill.jsx` — the tiny chip that tells
+// the user whether WebRTC signaling is up. Shows peerId (truncated),
+// current status color, error string on long-press.
 //
 // In the React app this sat in a fixed-position div above the tab content.
-// Flutter's equivalent is an `Align(alignment: topRight) + Padding` inside
-// a Stack — callers wrap their Scaffold body with `PeerStatusPillOverlay`.
+// In Flutter it's embedded directly into each tab page's AppBar `actions`,
+// which avoids overlapping (and stealing taps from) other AppBar actions
+// like the "add contact" button on the Chats tab.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,14 +14,9 @@ import '../../state/outbox_provider.dart';
 import '../../state/peer_connection_provider.dart';
 import '../../themes/orbits_tokens.dart';
 
-/// How much vertical space the floating pill reserves at the top of the
-/// screen — pages that render their own scroll views should use this as
-/// top padding so the first row isn't covered by the pill. Computed from
-/// pill height (≈28) + top offset (8) + a small breathing margin.
-const double kPillReserveHeight = 48;
-
 /// Raw pill — just the chip, no positioning. Use this when embedding inside
-/// a custom layout (e.g. a settings row that shows connection state).
+/// a custom layout (e.g. AppBar actions, or a settings row that shows
+/// connection state).
 class PeerStatusPill extends ConsumerWidget {
   const PeerStatusPill({super.key});
 
@@ -106,35 +102,6 @@ class PeerStatusPill extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Convenience wrapper that pins the pill to the top-right over arbitrary
-/// content. Use inside a Scaffold body:
-///   `body: PeerStatusPillOverlay(child: ...)`
-class PeerStatusPillOverlay extends StatelessWidget {
-  const PeerStatusPillOverlay({super.key, required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(child: child),
-        // `SafeArea` keeps the pill clear of notches/status bar; the extra
-        // 8px top offset matches the React build's visual weight.
-        const Positioned(
-          top: 0,
-          right: 0,
-          child: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(top: 8, right: 12),
-              child: PeerStatusPill(),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

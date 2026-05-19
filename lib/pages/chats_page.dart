@@ -41,7 +41,12 @@ class ChatsPage extends ConsumerWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+        titleSpacing: 16,
         actions: [
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: PeerStatusPill(),
+          ),
           IconButton(
             tooltip: 'Добавить контакт',
             icon: const Icon(Icons.person_add_alt_1_outlined),
@@ -57,10 +62,7 @@ class ChatsPage extends ConsumerWidget {
       body: chats.isEmpty
           ? const _EmptyState()
           : ListView.builder(
-              padding: EdgeInsets.only(
-                top: kPillReserveHeight + 4,
-                bottom: 16,
-              ),
+              padding: const EdgeInsets.only(top: 4, bottom: 16),
               itemCount: chats.length,
               itemBuilder: (context, i) => _ChatRow(chat: chats[i]),
             ),

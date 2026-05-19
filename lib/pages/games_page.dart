@@ -28,9 +28,16 @@ class GamesPage extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+        titleSpacing: 16,
+        actions: const [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            child: PeerStatusPill(),
+          ),
+        ],
       ),
       body: ListView(
-        padding: EdgeInsets.only(top: kPillReserveHeight + 8, bottom: 24),
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           // Hero strip
           Padding(

@@ -7,10 +7,11 @@
 // position survives switching) and the selected index just controls which
 // child is visible.
 //
-// The floating `PeerStatusPill` from the React tree is wired here via a
-// Stack overlay so it sits above every tab without each page having to
-// remember to include it. Call overlay + install / update banners still
-// pending — they depend on providers that haven't landed yet.
+// The `PeerStatusPill` is rendered inside each tab page's AppBar `actions`
+// rather than as a screen-level overlay — anchoring it to the AppBar avoids
+// overlapping (and stealing taps from) other AppBar actions like the
+// "add contact" button on the Chats tab. Call overlay + install / update
+// banners still pending — they depend on providers that haven't landed yet.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +25,6 @@ import 'pages/settings_page.dart';
 import 'state/calls_provider.dart';
 import 'state/messaging_notifier.dart';
 import 'ui/calls/call_overlay_mount.dart';
-import 'ui/peer/peer_status_pill.dart';
 import 'ui/primitives/orbs_tab_bar.dart';
 
 /// Which tab is currently selected. Exposed as a provider so pages can read
@@ -60,16 +60,14 @@ class AppShell extends ConsumerWidget {
     final shellBody = Stack(
       children: [
         Positioned.fill(
-          child: PeerStatusPillOverlay(
-            child: IndexedStack(
-              index: active.index,
-              children: const [
-                ChatsPage(),
-                DropPage(),
-                GamesPage(),
-                SettingsPage(),
-              ],
-            ),
+          child: IndexedStack(
+            index: active.index,
+            children: const [
+              ChatsPage(),
+              DropPage(),
+              GamesPage(),
+              SettingsPage(),
+            ],
           ),
         ),
         const Positioned.fill(child: CallOverlayMount()),
@@ -117,12 +115,10 @@ class AppShell extends ConsumerWidget {
       // all branches inside one component tree.
       //
       // Layering, bottom to top:
-      //   1. `PeerStatusPillOverlay` — wraps the IndexedStack and pins the
-      //      connection-status pill to the top-right.
+      //   1. `IndexedStack` of tab pages — each page hosts its own
+      //      `PeerStatusPill` inside its AppBar actions.
       //   2. `CallOverlayMount` — fills the whole screen when a call is
-      //      active (scrim + controls), zero-size otherwise. Sits above
-      //      the pill so a ringing-call scrim isn't visually broken up by
-      //      the pill chip.
+      //      active (scrim + controls), zero-size otherwise.
       body: centerDesktop
           ? Center(
               child: ConstrainedBox(
