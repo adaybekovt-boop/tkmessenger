@@ -104,6 +104,13 @@ dependencies:
   # 16-KB-aligned native libs, which we need for Play Store submission.
   mobile_scanner: ^6.0.2
 
+  # In-app update checker. `http` hits the GitHub Releases API on app
+  # startup (see `lib/core/update_checker.dart`); `url_launcher` opens
+  # the release page in the system browser on native targets — on web
+  # we just reload the page so the service worker pulls fresh files.
+  http: ^1.2.2
+  url_launcher: ^6.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
