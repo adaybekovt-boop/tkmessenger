@@ -6,10 +6,16 @@
 
 import 'package:flutter/material.dart';
 
+import '../core/deferred_loader.dart';
 import '../core/haptics.dart';
-import '../games/blackjack21/blackjack_page.dart';
-import '../games/blockblast/block_blast_page.dart';
-import '../games/chess/chess_page.dart';
+// Games are loaded as deferred libraries — each one compiles into its
+// own JS chunk on web (`main.dart.js_N.part.js`) that's fetched only
+// when the user first opens the corresponding tile. Keeps the initial
+// bundle ~200 KB lighter on cold boot for the (large) cohort of users
+// who never touch the games tab.
+import '../games/blackjack21/blackjack_page.dart' deferred as blackjack;
+import '../games/blockblast/block_blast_page.dart' deferred as blockblast;
+import '../games/chess/chess_page.dart' deferred as chess;
 import '../themes/orbits_tokens.dart';
 import '../ui/peer/peer_status_pill.dart';
 
@@ -84,7 +90,9 @@ class GamesPage extends StatelessWidget {
             ),
           ),
 
-          // Game rows
+          // Game rows. Each `onTap` pushes through `DeferredRouteLoader`
+          // so the game's JS chunk fetches on first open and the user
+          // sees a spinner instead of a frozen tap while it downloads.
           _GameRow(
             title: 'Block Blast',
             subtitle: 'Собирай линии, ставь рекорды',
@@ -94,8 +102,12 @@ class GamesPage extends StatelessWidget {
               hapticTap();
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => BlockBlastPage(
-                    onExit: () => Navigator.of(context).maybePop(),
+                  builder: (routeCtx) => DeferredRouteLoader(
+                    load: blockblast.loadLibrary,
+                    loadingLabel: 'Block Blast…',
+                    builder: (_) => blockblast.BlockBlastPage(
+                      onExit: () => Navigator.of(routeCtx).maybePop(),
+                    ),
                   ),
                 ),
               );
@@ -110,8 +122,12 @@ class GamesPage extends StatelessWidget {
               hapticTap();
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => BlackjackPage(
-                    onExit: () => Navigator.of(context).maybePop(),
+                  builder: (routeCtx) => DeferredRouteLoader(
+                    load: blackjack.loadLibrary,
+                    loadingLabel: '21 очко…',
+                    builder: (_) => blackjack.BlackjackPage(
+                      onExit: () => Navigator.of(routeCtx).maybePop(),
+                    ),
                   ),
                 ),
               );
@@ -126,8 +142,12 @@ class GamesPage extends StatelessWidget {
               hapticTap();
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => ChessPage(
-                    onExit: () => Navigator.of(context).maybePop(),
+                  builder: (routeCtx) => DeferredRouteLoader(
+                    load: chess.loadLibrary,
+                    loadingLabel: 'Шахматы…',
+                    builder: (_) => chess.ChessPage(
+                      onExit: () => Navigator.of(routeCtx).maybePop(),
+                    ),
                   ),
                 ),
               );

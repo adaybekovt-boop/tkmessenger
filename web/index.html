@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -10,26 +10,31 @@
 
     For more details:
     * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
   -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+
   <!--
-    Tell mobile browsers (and iOS Safari in particular) to use the device's
-    actual width as the layout viewport instead of falling back to the
-    desktop default of ~980 CSS pixels. Without this the Flutter canvas
-    renders at 980px wide and gets pinned to the top-left of the screen,
-    leaving the rest of the viewport empty / scrollable. `viewport-fit=cover`
-    lets us paint under the notch / home-indicator on iPhone; Flutter's
-    SafeArea inside the app keeps content out of those zones.
+    Mobile-browser viewport. Without this iOS Safari defaults to a 980 CSS-px
+    layout viewport and the Flutter canvas gets pinned to the top-left of
+    the screen with empty scroll area around it. `viewport-fit=cover` lets
+    us paint under the notch / home-indicator — Flutter's SafeArea inside
+    the app keeps content out of those zones.
   -->
   <meta name="viewport"
         content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+
   <meta name="description" content="Orbits — P2P encrypted messenger.">
+  <!--
+    Browser chrome / iOS Safari status-bar tint. Pinned to the Graphite
+    background colour so the URL bar blends into the app on cold boot
+    (no white flash before Flutter draws its first frame).
+  -->
+  <meta name="theme-color" content="#0F1319">
+  <meta name="color-scheme" content="dark light">
+
   <!--
     NOTE: Drift on web needs SharedArrayBuffer (used by sqlite3.wasm + the
     drift worker for fast cross-isolate transfers). SharedArrayBuffer is
@@ -48,26 +53,139 @@
     which is roughly 10× slower per query.
   -->
 
-  <!-- iOS meta tags & icons -->
+  <!--
+    Preload the canvaskit wasm in parallel with main.dart.js. Flutter
+    web's default bootstrap fetches `canvaskit/canvaskit.wasm` (~3 MB)
+    only after main.dart.js has been parsed; by hinting it here we let
+    the browser start the download while the JS is still arriving, which
+    typically shaves 500-1500 ms off cold-boot time on mobile networks.
+    `crossorigin` is required because the wasm is fetched with CORS by
+    the loader — without it the preload doesn't get reused and the
+    browser warns in the console.
+  -->
+  <link rel="preload" as="fetch" type="application/wasm" crossorigin
+        href="canvaskit/canvaskit.wasm">
+  <!--
+    `flutter_bootstrap.js` is the file `flutter build web` injects to
+    load main.dart.js + service worker. Preloading lets the connection
+    open in parallel with the manifest fetch.
+  -->
+  <link rel="preload" as="script" href="flutter_bootstrap.js">
+
+  <!-- iOS / PWA tags -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="orbits_flutter">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Orbits">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>orbits_flutter</title>
+  <title>Orbits — P2P Messenger</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Boot splash. Renders before main.dart.js parses so the user sees the
+    app's brand colour + a spinner instead of a white flash for the
+    1-3 seconds it takes canvaskit + the wasm worker to come online.
+    The colours match the Graphite theme (the default) — when a user
+    switches themes the splash still flashes graphite on cold boot, but
+    the trade-off (no flicker for the 95 % case) is worth it.
+
+    The splash is removed by polling for Flutter's injected DOM root
+    (`flutter-view` / `flt-glass-pane`) — the moment that node appears
+    the canvas has started painting and the splash can fade out. No
+    `package:web` interop needed on the Dart side.
+  -->
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0F1319; }
+    #orbits-splash {
+      position: fixed; inset: 0; z-index: 2147483647;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 35%, #1B2230 0%, #0F1319 70%);
+      color: #E4E9F1;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+                   sans-serif;
+      transition: opacity 320ms ease-out;
+    }
+    #orbits-splash.fading { opacity: 0; pointer-events: none; }
+    #orbits-splash .logo {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: rgba(138, 180, 212, 0.16);
+      border: 1px solid rgba(138, 180, 212, 0.32);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 22px;
+    }
+    #orbits-splash .logo::before {
+      content: ""; width: 24px; height: 24px; border-radius: 50%;
+      background: #8AB4D4;
+      box-shadow:
+        0 0 0 6px rgba(138, 180, 212, 0.22),
+        0 0 24px rgba(138, 180, 212, 0.45);
+    }
+    #orbits-splash .name {
+      font-size: 18px; font-weight: 600; letter-spacing: 0.12em;
+      color: #E4E9F1; margin-bottom: 8px;
+    }
+    #orbits-splash .sub {
+      font-size: 12px; color: #8B96A7; letter-spacing: 0.06em;
+    }
+    #orbits-splash .spinner {
+      margin-top: 28px; width: 22px; height: 22px;
+      border: 2px solid rgba(228, 233, 241, 0.18);
+      border-top-color: #8AB4D4;
+      border-radius: 50%;
+      animation: orbits-spin 720ms linear infinite;
+    }
+    @keyframes orbits-spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <div id="orbits-splash" role="status" aria-label="Загрузка Orbits">
+    <div class="logo"></div>
+    <div class="name">ORBITS P2P</div>
+    <div class="sub">Шифрованный мессенджер без серверов</div>
+    <div class="spinner"></div>
+  </div>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
+  <script>
+    // Tear the splash down once Flutter has injected its first painted
+    // node. Polling beats a fixed timeout because cold boots on slow
+    // networks can comfortably exceed 5 s — we'd either dismiss too
+    // early (flash of empty canvas) or hold on too long.
+    (function () {
+      var splash = document.getElementById('orbits-splash');
+      if (!splash) return;
+      // Safety net — if something goes wrong we never want the splash
+      // to wedge the UI. 30 s is much longer than even pathological
+      // cold boots; anything past that and the user has a real problem
+      // the splash is hiding.
+      var giveUpAt = Date.now() + 30000;
+      function tick() {
+        var rendered = document.querySelector(
+          'flutter-view, flt-glass-pane, flt-scene-host'
+        );
+        if (rendered || Date.now() > giveUpAt) {
+          splash.classList.add('fading');
+          setTimeout(function () { splash.remove(); }, 350);
+          return;
+        }
+        setTimeout(tick, 80);
+      }
+      // Wait one frame so we don't probe the DOM before the parser has
+      // even reached `flutter_bootstrap.js`.
+      requestAnimationFrame(tick);
+    })();
+  </script>
+
+  <!--
+    `flutter_bootstrap.js` is generated by `flutter build web`. It loads
+    main.dart.js, registers the service worker for offline / PWA install,
+    and handles canvaskit fetching. We keep it as the unmodified default;
+    splash + preload above are the only customisations.
   -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
