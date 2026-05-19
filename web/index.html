@@ -18,8 +18,18 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <!--
+    Tell mobile browsers (and iOS Safari in particular) to use the device's
+    actual width as the layout viewport instead of falling back to the
+    desktop default of ~980 CSS pixels. Without this the Flutter canvas
+    renders at 980px wide and gets pinned to the top-left of the screen,
+    leaving the rest of the viewport empty / scrollable. `viewport-fit=cover`
+    lets us paint under the notch / home-indicator on iPhone; Flutter's
+    SafeArea inside the app keeps content out of those zones.
+  -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="description" content="Orbits — P2P encrypted messenger.">
-
   <!--
     NOTE: Drift on web needs SharedArrayBuffer (used by sqlite3.wasm + the
     drift worker for fast cross-isolate transfers). SharedArrayBuffer is
