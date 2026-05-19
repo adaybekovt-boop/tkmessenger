@@ -9,8 +9,11 @@
 // the latest GitHub release tag.
 
 /// Current app version (semver). Bump together with `pubspec.yaml`'s
-/// `version:` and the GitHub release tag at cut time.
-const String kAppVersion = '0.1.0';
+/// `version:` and the GitHub release tag at cut time — the in-app
+/// update checker compares this against `tag_name` from
+/// `/repos/{owner}/{repo}/releases/latest`, so it has to match what
+/// you tag on GitHub (minus the leading `v`).
+const String kAppVersion = '8.1.0';
 
 /// `owner/repo` for the upstream GitHub project. The update checker
 /// queries `https://api.github.com/repos/$kGithubRepo/releases/latest`.
