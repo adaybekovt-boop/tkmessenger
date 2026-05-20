@@ -42,6 +42,7 @@ jobs:
       - name: Verify static assets
         run: |
           test -f build/web/index.html
+          test -f build/web/404.html
           test -f build/web/sqlite3.wasm
           test -f build/web/drift_worker.js
 

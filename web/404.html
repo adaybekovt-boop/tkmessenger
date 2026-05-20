@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0F1319">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex">
+
+  <!--
+    GitHub Pages serves this file for any path under `/tkmessenger/` that
+    doesn't match a real asset. We hijack that to render the invite
+    landing page when the path looks like `/tkmessenger/add/<ORBIT-…>` —
+    QR codes printed today encode exactly that URL via
+    `buildAddContactUrl()` in `lib/peer/add_contact_link.dart`. For any
+    other unknown path we fall back to a friendly "not found".
+
+    Kept fully self-contained — no external fonts, no analytics, no
+    framework. The 404 path is what loads when a stranger opens the QR
+    on a phone they've never touched the app on; pulling in a CDN
+    request would add a network dependency for that first impression.
+  -->
+
+  <title>Orbits — Добавить контакт</title>
+  <link rel="icon" type="image/png" href="/tkmessenger/favicon.png">
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0F1319;
+      --bg-elev: #1B2230;
+      --text: #E4E9F1;
+      --muted: #8B96A7;
+      --accent: #8AB4D4;
+      --accent-soft: rgba(138, 180, 212, 0.16);
+      --accent-border: rgba(138, 180, 212, 0.32);
+      --border: rgba(228, 233, 241, 0.10);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 50% 0%, #1B2230 0%, #0F1319 60%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+                   sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 20px 48px;
+      gap: 20px;
+    }
+
+    /* Header — recreates the splash logo from index.html so the page
+       reads as "the same app" the user is about to install. */
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .brand .logo {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .brand .logo::before {
+      content: ""; width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow:
+        0 0 0 5px rgba(138, 180, 212, 0.22),
+        0 0 22px rgba(138, 180, 212, 0.45);
+    }
+    .brand .name {
+      font-size: 16px; font-weight: 600; letter-spacing: 0.14em;
+    }
+    .brand .sub {
+      font-size: 12px; color: var(--muted); letter-spacing: 0.06em;
+      text-align: center;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(27, 34, 48, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .card h1 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* Peer-id pill — big, monospace, easy to read aloud over a phone
+       call and easy to long-press / copy on mobile. */
+    .peer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 18px;
+      padding: 14px 14px;
+      background: rgba(15, 19, 25, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .peer .label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.16em;
+    }
+    .peer .id {
+      flex: 1;
+      font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas,
+                   "Liberation Mono", monospace;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      user-select: all;
+      -webkit-user-select: all;
+      word-break: break-all;
+    }
+    .copy {
+      flex: 0 0 auto;
+      appearance: none;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background 120ms ease;
+    }
+    .copy:hover { background: rgba(138, 180, 212, 0.26); }
+    .copy:active { transform: scale(0.97); }
+    .copy.ok {
+      background: rgba(120, 200, 140, 0.18);
+      border-color: rgba(120, 200, 140, 0.4);
+      color: #9CDDB0;
+    }
+
+    /* Install grid — three cards stacked on mobile, side-by-side on
+       wide screens. Each links to the corresponding release asset on
+       GitHub via the `releases/latest/download/…` redirect, so we never
+       need to bump a version string in this static file. */
+    .install {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    @media (min-width: 520px) {
+      .install { grid-template-columns: 1fr 1fr; }
+      .install .web { grid-column: span 2; }
+    }
+    .install a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 14px;
+      background: rgba(15, 19, 25, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      text-decoration: none;
+      transition: background 120ms ease, border-color 120ms ease;
+    }
+    .install a:hover {
+      background: rgba(138, 180, 212, 0.08);
+      border-color: var(--accent-border);
+    }
+    .install a .ico {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--accent-soft);
+      border-radius: 10px;
+      color: var(--accent);
+    }
+    .install a .meta { flex: 1; min-width: 0; }
+    .install a .head {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .install a .desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .footer {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .footer a:hover { text-decoration: underline; }
+
+    /* 404 fallback — what shows when the path isn't `/add/<id>`. */
+    .notfound h1 { font-size: 22px; margin-bottom: 8px; }
+    .notfound .home {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 10px 16px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    /* Toast for "copied" feedback — fades in/out via a class swap. */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(15, 19, 25, 0.92);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="brand">
+    <div class="logo"></div>
+    <div class="name">ORBITS P2P</div>
+    <div class="sub">Шифрованный мессенджер без серверов</div>
+  </div>
+
+  <div id="root"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // ─── Path parse ────────────────────────────────────────────────
+    //
+    // The QR encodes:
+    //   https://<host>/tkmessenger/add/ORBIT-XXXXXX
+    //
+    // GitHub Pages serves *this* file (404.html) for that path because
+    // there's no real `/add/<id>` asset. `location.pathname` retains
+    // the original — that's the contract we rely on. We also accept
+    // any trailing-slash or fragment so a casually-shared URL still
+    // resolves.
+    //
+    // We do NOT trust the rest of the URL for anything beyond display
+    // — the peerId itself is the trust anchor inside Orbits, so a
+    // spoofed host buys an attacker nothing.
+    var path = (location.pathname || '').replace(/\/+$/, '');
+    var m = path.match(/\/add\/(ORBIT-[0-9A-F]{6})$/i);
+    var peerId = m ? m[1].toUpperCase() : null;
+
+    var root = document.getElementById('root');
+    var toastEl = document.getElementById('toast');
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(function () {
+        toastEl.classList.remove('show');
+      }, 1600);
+    }
+
+    // SVG icons inline so a flaky CDN never blanks them out.
+    var ICON_ANDROID =
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" ' +
+      'stroke-linejoin="round">' +
+      '<path d="M5 16V10a7 7 0 0 1 14 0v6"/>' +
+      '<path d="M3 16h18v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' +
+      '<path d="M8 7l-1-2"/><path d="M16 7l1-2"/>' +
+      '<circle cx="9" cy="12" r="0.6" fill="currentColor"/>' +
+      '<circle cx="15" cy="12" r="0.6" fill="currentColor"/></svg>';
+    var ICON_WINDOWS =
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">' +
+      '<path d="M3 5.5 11 4v8H3zM12 3.8 21 2.5V12h-9zM3 13h8v7L3 18.5zM12 13h9v8.5L12 20z"/>' +
+      '</svg>';
+    var ICON_WEB =
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" ' +
+      'stroke-linejoin="round">' +
+      '<circle cx="12" cy="12" r="9"/>' +
+      '<path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/>' +
+      '<path d="M12 3a14 14 0 0 0 0 18"/></svg>';
+
+    function renderLanding(id) {
+      // Three install paths — all link via `releases/latest/download/…`
+      // so this static file never has to know the current version. The
+      // CI workflow at `.github/workflows/build.yml` publishes each
+      // asset under exactly these filenames.
+      var repo = 'https://github.com/adaybekovt-boop/tkmessenger';
+      var apkUrl = repo + '/releases/latest/download/orbits-android-universal.apk';
+      var exeUrl = repo + '/releases/latest/download/orbits-windows-x64.exe';
+      // "Open in browser" carries the peerId as a query param so the
+      // Flutter web app *can* opt in later to auto-fill the add-contact
+      // sheet on boot. For now (no in-app handler yet) the user just
+      // lands on the app — the peerId is already copied to their
+      // clipboard when they tap, so pasting into the manual tab is one
+      // gesture.
+      var webUrl = '/tkmessenger/?add=' + encodeURIComponent(id);
+
+      var html =
+        '<div class="card">' +
+          '<h1>Тебя зовут в Orbits</h1>' +
+          '<p>Друг отправил приглашение в P2P-чат. Установи Orbits ' +
+          'и добавь этот ID — соединение зашифровано end-to-end, ' +
+          'без серверов посередине.</p>' +
+          '<div class="peer">' +
+            '<span class="label">ID</span>' +
+            '<span class="id" id="peer-id">' + id + '</span>' +
+            '<button class="copy" id="copy-btn" type="button">' +
+              'Копировать' +
+            '</button>' +
+          '</div>' +
+          '<div class="install">' +
+            '<a href="' + apkUrl + '" rel="noopener">' +
+              '<div class="ico">' + ICON_ANDROID + '</div>' +
+              '<div class="meta">' +
+                '<div class="head">Android</div>' +
+                '<div class="desc">APK с GitHub Releases</div>' +
+              '</div>' +
+            '</a>' +
+            '<a href="' + exeUrl + '" rel="noopener">' +
+              '<div class="ico">' + ICON_WINDOWS + '</div>' +
+              '<div class="meta">' +
+                '<div class="head">Windows</div>' +
+                '<div class="desc">Инсталлер .exe</div>' +
+              '</div>' +
+            '</a>' +
+            '<a class="web" href="' + webUrl + '" id="web-btn">' +
+              '<div class="ico">' + ICON_WEB + '</div>' +
+              '<div class="meta">' +
+                '<div class="head">Открыть в браузере</div>' +
+                '<div class="desc">' +
+                  'Без установки — ID будет в буфере обмена' +
+                '</div>' +
+              '</div>' +
+            '</a>' +
+          '</div>' +
+        '</div>' +
+        '<div class="footer">' +
+          '<a href="' + repo + '" rel="noopener">Что такое Orbits</a>' +
+        '</div>';
+      root.innerHTML = html;
+
+      // Wire up Copy. We use the modern clipboard API where available
+      // and fall back to a hidden-textarea selection on older browsers
+      // (Safari < 13.4, some in-app webviews). The classname toggle
+      // gives the button a brief visual ack.
+      function copyId() {
+        var ok = function () {
+          var btn = document.getElementById('copy-btn');
+          btn.textContent = 'Скопировано';
+          btn.classList.add('ok');
+          showToast('ID скопирован — вставь его в «Добавить контакт»');
+          setTimeout(function () {
+            btn.textContent = 'Копировать';
+            btn.classList.remove('ok');
+          }, 1800);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(id).then(ok, fallback);
+        } else {
+          fallback();
+        }
+        function fallback() {
+          var ta = document.createElement('textarea');
+          ta.value = id;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); ok(); }
+          catch (e) { showToast('Не вышло скопировать — выдели вручную'); }
+          document.body.removeChild(ta);
+        }
+      }
+      document.getElementById('copy-btn').addEventListener('click', copyId);
+
+      // "Open in browser" — copy the ID first so paste works on the
+      // very next screen. Don't preventDefault: the href still
+      // navigates as usual right after.
+      document.getElementById('web-btn').addEventListener('click', function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(id).catch(function () { /* ignore */ });
+        }
+      });
+    }
+
+    function render404() {
+      root.innerHTML =
+        '<div class="card notfound">' +
+          '<h1>Страница не найдена</h1>' +
+          '<p>Возможно, ссылка устарела или была введена с ошибкой. ' +
+          'Если у тебя есть QR-код от друга — попробуй отсканировать ' +
+          'его внутри приложения через «Добавить контакт».</p>' +
+          '<a class="home" href="/tkmessenger/">Открыть Orbits</a>' +
+        '</div>';
+    }
+
+    if (peerId) renderLanding(peerId);
+    else render404();
+  </script>
+</body>
+</html>
