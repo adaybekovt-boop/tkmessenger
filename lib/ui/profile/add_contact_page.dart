@@ -22,7 +22,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/haptics.dart';
 import '../../pages/chat_view_page.dart';
-import '../../peer/helpers.dart';
+import '../../peer/add_contact_link.dart';
 import '../../state/local_profile_provider.dart';
 import '../../storage/db.dart' as db;
 import '../../themes/orbits_tokens.dart';
@@ -60,9 +60,14 @@ class _AddContactPageState extends ConsumerState<AddContactPage>
   }
 
   Future<void> _accept(String raw) async {
-    final normalized = normalizePeerId(raw);
-    if (!isValidPeerId(normalized)) {
-      _toast('Неверный формат ID (должен быть ORBIT-XXXXXX)');
+    // `extractPeerIdFromInput` accepts bare ORBIT-XXXXXX, the canonical
+    // `https://orbits.app/add/<id>` invite link, and the legacy
+    // `orbits://add/<id>` custom-scheme form — same logic the scanner
+    // and the manual-paste field share so QR contents and pasted links
+    // behave identically.
+    final normalized = extractPeerIdFromInput(raw);
+    if (normalized == null) {
+      _toast('Неверный формат — ожидается ORBIT-XXXXXX или invite-ссылка');
       return;
     }
     final selfId = ref.read(currentPeerIdProvider) ?? '';
@@ -316,7 +321,7 @@ class _ManualTabState extends State<_ManualTab> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Введи Peer ID',
+                'Введи Peer ID или ссылку',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
@@ -326,7 +331,8 @@ class _ManualTabState extends State<_ManualTab> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Формат: ORBIT-XXXXXX (X — hex-символ).',
+                'ORBIT-XXXXXX (X — hex), либо ссылка-приглашение '
+                'https://orbits.app/add/…',
                 style: TextStyle(
                   color: tokens.muted,
                   fontFamily: tokens.fontBody,
@@ -336,18 +342,17 @@ class _ManualTabState extends State<_ManualTab> {
               TextField(
                 controller: _ctl,
                 autofocus: true,
-                textCapitalization: TextCapitalization.characters,
                 style: TextStyle(fontFamily: tokens.fontMono),
                 inputFormatters: [
-                  // Strip whitespace + force upper-case as the user types,
-                  // matching the canonicalisation in `normalizePeerId`.
+                  // Strip whitespace so a pasted ID with stray spaces
+                  // still validates. Case is normalised downstream by
+                  // `extractPeerIdFromInput` — we deliberately don't
+                  // force upper-case here because a pasted URL's scheme
+                  // / host needs to stay lowercase to parse.
                   FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                  TextInputFormatter.withFunction((_, value) {
-                    return value.copyWith(text: value.text.toUpperCase());
-                  }),
                 ],
                 decoration: const InputDecoration(
-                  labelText: 'Peer ID',
+                  labelText: 'Peer ID или ссылка',
                   hintText: 'ORBIT-ABC123',
                 ),
                 onSubmitted: (_) => _submit(),

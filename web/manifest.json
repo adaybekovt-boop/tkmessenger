@@ -1,13 +1,17 @@
 {
-    "name": "orbits_flutter",
-    "short_name": "orbits_flutter",
+    "name": "Orbits — P2P Messenger",
+    "short_name": "Orbits",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0F1319",
+    "theme_color": "#0F1319",
+    "description": "End-to-end encrypted peer-to-peer messenger. Chats, calls, and file transfer go directly between devices — no server stores your messages.",
+    "lang": "ru",
+    "dir": "ltr",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
+    "categories": ["social", "communication"],
     "icons": [
         {
             "src": "icons/Icon-192.png",

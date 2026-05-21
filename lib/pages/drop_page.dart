@@ -27,9 +27,16 @@ class DropPage extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+        titleSpacing: 16,
+        actions: const [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            child: PeerStatusPill(),
+          ),
+        ],
       ),
       body: ListView(
-        padding: EdgeInsets.only(top: kPillReserveHeight + 12, bottom: 24),
+        padding: const EdgeInsets.only(top: 12, bottom: 24),
         children: [
           // Hero icon + intro
           Padding(

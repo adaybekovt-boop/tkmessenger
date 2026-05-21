@@ -1,7 +1,7 @@
 name: orbits_flutter
 description: Orbits P2P Messenger — Flutter port. Mirrors the React/Vite project in git_push/.
 publish_to: 'none'
-version: 0.1.0
+version: 8.1.0+1
 
 environment:
   # Dart 3.6+ / Flutter 3.27+ for `Color.withValues(alpha:)` and related
@@ -103,6 +103,13 @@ dependencies:
   # deps and breaks under Android 16 KB page alignment). v6 ships with
   # 16-KB-aligned native libs, which we need for Play Store submission.
   mobile_scanner: ^6.0.2
+
+  # In-app update checker. `http` hits the GitHub Releases API on app
+  # startup (see `lib/core/update_checker.dart`); `url_launcher` opens
+  # the release page in the system browser on native targets — on web
+  # we just reload the page so the service worker pulls fresh files.
+  http: ^1.2.2
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

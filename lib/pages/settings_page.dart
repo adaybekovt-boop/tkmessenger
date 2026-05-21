@@ -53,10 +53,17 @@ class SettingsPage extends ConsumerWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+        titleSpacing: 16,
+        actions: const [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            child: PeerStatusPill(),
+          ),
+        ],
       ),
       body: ListView(
-        padding: EdgeInsets.only(
-          top: kPillReserveHeight + 4,
+        padding: const EdgeInsets.only(
+          top: 4,
           bottom: 32,
         ),
         children: [
